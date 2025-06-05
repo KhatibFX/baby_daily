@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.khatibfx.baby_daily"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 35
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
