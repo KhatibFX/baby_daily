@@ -123,31 +123,17 @@ class SessionProvider with ChangeNotifier {
   }
 
   Future<void> updateSession(Session session) async {
-    if (!session.isClosed) {
-      _currentSession = session;
+    if (session.id != null) {
+      // For existing sessions, always use update
       await _db.updateSession(session);
-    } else {
-      // Create a new editing session based on this one
-      final editingSession = session.copyWith(
-        id: null,
-        isClosed: false,
-        wakeUpTime: session.wakeUpTime,
-        pee: session.pee,
-        peeRemarks: session.peeRemarks,
-        poopAmount: session.poopAmount,
-        poopConsistency: session.poopConsistency,
-        poopColor: session.poopColor,
-        abnormalPoopPhotoPath: session.abnormalPoopPhotoPath,
-        hasAbnormalPoopPhoto: session.hasAbnormalPoopPhoto,
-        milkIntake: session.milkIntake,
-        vitaminAD: session.vitaminAD,
-        sleepTime: session.sleepTime,
-        sessionPhotoPath: session.sessionPhotoPath,
-        hasSessionPhoto: session.hasSessionPhoto,
-      );
-      _currentSession = await _db.createSession(editingSession);
+      // If this is the current session, update it
+      if (_currentSession?.id == session.id) {
+        _currentSession = session;
+      }
+      // Refresh the sessions list
+      await loadSessions();
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   Future<List<Session>> getClosedSessionsInRange(DateTime start, DateTime end) async {
@@ -312,5 +298,14 @@ class SessionProvider with ChangeNotifier {
       print('Error in saveAbnormalPoopPhoto: $e');
       notifyListeners();
     }
+  }
+
+  Future<String?> savePhotoOnly(XFile photo, String prefix) async {
+    return await _savePhotoFile(photo, prefix);
+  }
+
+  Future<bool> deletePhotoOnly(String photoPath) async {
+    final absolutePath = await _getAbsolutePath(photoPath);
+    return await _deletePhotoFile(absolutePath);
   }
 }

@@ -4,6 +4,7 @@ import '../models/session.dart';
 import '../providers/session_provider.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
+import 'edit_session_screen.dart';
 
 class SessionHistoryScreen extends StatelessWidget {
   @override
@@ -72,10 +73,11 @@ class SessionHistoryScreen extends StatelessWidget {
                   _buildPhotoSection(context, session.abnormalPoopPhotoPath, 'Abnormal Poop Photo'),
                 SizedBox(height: 16),
                 ElevatedButton(
-                  onPressed: () async {
-                    await provider.updateSession(session);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Session updated successfully')),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => EditSessionScreen(originalSession: session),
+                      ),
                     );
                   },
                   child: Text('Edit Session'),
