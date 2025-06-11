@@ -20,8 +20,9 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
+      onUpgrade: _upgradeDB,
     );
   }
 
@@ -40,9 +41,20 @@ class DatabaseService {
         vitaminAD INTEGER NOT NULL,
         sleepTime TEXT,
         sessionPhotoPath TEXT,
+        hasSessionPhoto INTEGER NOT NULL,
+        hasAbnormalPoopPhoto INTEGER NOT NULL,
         isClosed INTEGER NOT NULL
       )
     ''');
+  }
+
+  Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE sessions ADD COLUMN hasSessionPhoto INTEGER NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE sessions ADD COLUMN hasAbnormalPoopPhoto INTEGER NOT NULL DEFAULT 0');
+      await db.execute('UPDATE sessions SET hasSessionPhoto = CASE WHEN sessionPhotoPath IS NOT NULL THEN 1 ELSE 0 END');
+      await db.execute('UPDATE sessions SET hasAbnormalPoopPhoto = CASE WHEN abnormalPoopPhotoPath IS NOT NULL THEN 1 ELSE 0 END');
+    }
   }
 
   Future<Session> createSession(Session session) async {

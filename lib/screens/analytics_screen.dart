@@ -4,6 +4,7 @@ import '../models/session.dart';
 import '../providers/session_provider.dart';
 import 'package:intl/intl.dart';
 import 'dart:math';
+import 'dart:io';
 
 class AnalyticsScreen extends StatefulWidget {
   @override
@@ -23,7 +24,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   Future<void> _loadSessions() async {
     final provider = Provider.of<SessionProvider>(context, listen: false);
-    final sessions = await provider.getSessionsInRange(_startDate, _endDate);
+    final sessions = await provider.getClosedSessionsInRange(_startDate, _endDate);
     setState(() {
       _sessions = sessions;
     });
@@ -70,7 +71,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 ),
                 TextButton(
                   onPressed: () async {
-                    final DateTimeRange? picked = await showDateRangePicker(
+                    final DateTimeRange? dateRange = await showDateRangePicker(
                       context: context,
                       firstDate: DateTime.now().subtract(Duration(days: 365)),
                       lastDate: DateTime.now(),
@@ -79,12 +80,41 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                         end: _endDate,
                       ),
                     );
-                    if (picked != null) {
-                      setState(() {
-                        _startDate = picked.start;
-                        _endDate = picked.end;
-                      });
-                      _loadSessions();
+                    
+                    if (dateRange != null) {
+                      // Get start time
+                      final TimeOfDay? startTime = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.fromDateTime(_startDate),
+                      );
+                      
+                      if (startTime != null) {
+                        // Get end time
+                        final TimeOfDay? endTime = await showTimePicker(
+                          context: context,
+                          initialTime: TimeOfDay.fromDateTime(_endDate),
+                        );
+                        
+                        if (endTime != null) {
+                          setState(() {
+                            _startDate = DateTime(
+                              dateRange.start.year,
+                              dateRange.start.month,
+                              dateRange.start.day,
+                              startTime.hour,
+                              startTime.minute,
+                            );
+                            _endDate = DateTime(
+                              dateRange.end.year,
+                              dateRange.end.month,
+                              dateRange.end.day,
+                              endTime.hour,
+                              endTime.minute,
+                            );
+                          });
+                          _loadSessions();
+                        }
+                      }
                     }
                   },
                   child: Text('Change'),
@@ -173,7 +203,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   Widget _buildRandomPhoto() {
     final sessionsWithPhotos =
-        _sessions.where((s) => s.sessionPhotoPath != null).toList();
+        _sessions.where((s) => s.hasSessionPhoto && s.sessionPhotoPath != null).toList();
     if (sessionsWithPhotos.isEmpty) return SizedBox.shrink();
 
     final random = Random();
@@ -190,11 +220,36 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             SizedBox(height: 8),
-            Image.asset(randomSession.sessionPhotoPath!),
-            SizedBox(height: 8),
-            Text(
-              DateFormat('MMM dd, yyyy HH:mm').format(randomSession.wakeUpTime),
-              style: Theme.of(context).textTheme.bodySmall,
+            FutureBuilder<bool>(
+              future: File(randomSession.sessionPhotoPath!).exists(),
+              builder: (context, snapshot) {
+                if (snapshot.data == true) {
+                  return Column(
+                    children: [
+                      Image.file(
+                        File(randomSession.sessionPhotoPath!),
+                        height: 200,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            height: 200,
+                            width: double.infinity,
+                            color: Colors.grey[300],
+                            child: Center(child: Text('Failed to load image')),
+                          );
+                        },
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        DateFormat('MMM dd, yyyy HH:mm').format(randomSession.wakeUpTime),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  );
+                }
+                return const SizedBox.shrink();
+              },
             ),
           ],
         ),

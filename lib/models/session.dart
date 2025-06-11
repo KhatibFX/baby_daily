@@ -14,10 +14,12 @@ class Session {
   PoopConsistency poopConsistency;
   PoopColor poopColor;
   String? abnormalPoopPhotoPath;
+  bool hasAbnormalPoopPhoto;
   int milkIntake;
   bool vitaminAD;
   DateTime? sleepTime;
   String? sessionPhotoPath;
+  bool hasSessionPhoto;
   bool isClosed;
 
   Session({
@@ -29,10 +31,12 @@ class Session {
     this.poopConsistency = PoopConsistency.normal,
     this.poopColor = PoopColor.yellow,
     this.abnormalPoopPhotoPath,
+    this.hasAbnormalPoopPhoto = false,
     this.milkIntake = 0,
     this.vitaminAD = false,
     this.sleepTime,
     this.sessionPhotoPath,
+    this.hasSessionPhoto = false,
     this.isClosed = false,
   });
 
@@ -46,10 +50,12 @@ class Session {
       'poopConsistency': poopConsistency.index,
       'poopColor': poopColor.index,
       'abnormalPoopPhotoPath': abnormalPoopPhotoPath,
+      'hasAbnormalPoopPhoto': hasAbnormalPoopPhoto ? 1 : 0,
       'milkIntake': milkIntake,
       'vitaminAD': vitaminAD ? 1 : 0,
       'sleepTime': sleepTime?.toIso8601String(),
       'sessionPhotoPath': sessionPhotoPath,
+      'hasSessionPhoto': hasSessionPhoto ? 1 : 0,
       'isClosed': isClosed ? 1 : 0,
     };
   }
@@ -64,12 +70,14 @@ class Session {
       poopConsistency: PoopConsistency.values[map['poopConsistency']],
       poopColor: PoopColor.values[map['poopColor']],
       abnormalPoopPhotoPath: map['abnormalPoopPhotoPath'],
+      hasAbnormalPoopPhoto: map['hasAbnormalPoopPhoto'] == 1,
       milkIntake: map['milkIntake'],
       vitaminAD: map['vitaminAD'] == 1,
       sleepTime: map['sleepTime'] != null 
           ? DateTime.parse(map['sleepTime'])
           : null,
       sessionPhotoPath: map['sessionPhotoPath'],
+      hasSessionPhoto: map['hasSessionPhoto'] == 1,
       isClosed: map['isClosed'] == 1,
     );
   }
@@ -83,10 +91,12 @@ class Session {
     PoopConsistency? poopConsistency,
     PoopColor? poopColor,
     String? abnormalPoopPhotoPath,
+    bool? hasAbnormalPoopPhoto,
     int? milkIntake,
     bool? vitaminAD,
     DateTime? sleepTime,
     String? sessionPhotoPath,
+    bool? hasSessionPhoto,
     bool? isClosed,
   }) {
     return Session(
@@ -98,10 +108,12 @@ class Session {
       poopConsistency: poopConsistency ?? this.poopConsistency,
       poopColor: poopColor ?? this.poopColor,
       abnormalPoopPhotoPath: abnormalPoopPhotoPath ?? this.abnormalPoopPhotoPath,
+      hasAbnormalPoopPhoto: hasAbnormalPoopPhoto ?? this.hasAbnormalPoopPhoto,
       milkIntake: milkIntake ?? this.milkIntake,
       vitaminAD: vitaminAD ?? this.vitaminAD,
       sleepTime: sleepTime ?? this.sleepTime,
       sessionPhotoPath: sessionPhotoPath ?? this.sessionPhotoPath,
+      hasSessionPhoto: hasSessionPhoto ?? this.hasSessionPhoto,
       isClosed: isClosed ?? this.isClosed,
     );
   }

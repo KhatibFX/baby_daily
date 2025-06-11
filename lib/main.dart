@@ -16,7 +16,12 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider<SessionProvider>(
-      create: (_) => SessionProvider(),
+      create: (_) {
+        final provider = SessionProvider();
+        // Load sessions immediately when the app starts
+        provider.loadSessions();
+        return provider;
+      },
       child: MaterialApp(
         title: 'Baby Daily',
         theme: ThemeData(

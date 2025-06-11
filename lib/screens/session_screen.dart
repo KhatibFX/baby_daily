@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:path/path.dart' as path;
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -8,7 +9,29 @@ import 'package:provider/provider.dart';
 import '../models/session.dart';
 import '../providers/session_provider.dart';
 
-class SessionScreen extends StatelessWidget {
+class SessionScreen extends StatefulWidget {
+  @override
+  _SessionScreenState createState() => _SessionScreenState();
+}
+
+class _SessionScreenState extends State<SessionScreen> {
+  late TextEditingController _peeRemarksController;
+  late TextEditingController _milkIntakeController;
+
+  @override
+  void initState() {
+    super.initState();
+    _peeRemarksController = TextEditingController();
+    _milkIntakeController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _peeRemarksController.dispose();
+    _milkIntakeController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<SessionProvider>(
@@ -24,6 +47,21 @@ class SessionScreen extends StatelessWidget {
           );
         }
 
+        // Update sleep time and controllers when session changes
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          sessionProvider.updateDefaultSleepTime();
+        });
+
+        // Update controllers when session changes
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_peeRemarksController.text != session.peeRemarks) {
+            _peeRemarksController.text = session.peeRemarks ?? '';
+          }
+          if (_milkIntakeController.text != session.milkIntake.toString()) {
+            _milkIntakeController.text = session.milkIntake.toString();
+          }
+        });
+
         return SingleChildScrollView(
           padding: EdgeInsets.all(16.0),
           child: Column(
@@ -36,7 +74,9 @@ class SessionScreen extends StatelessWidget {
               _buildVitaminSection(context, session, sessionProvider),
               _buildPhotoSection(context, session, sessionProvider),
               SizedBox(height: 20),
-              if (!session.isClosed)
+              if (!session.isClosed) ...[
+                _buildSleepTimeSection(context, session, sessionProvider),
+                SizedBox(height: 20),
                 Center(
                   child: ElevatedButton(
                     onPressed: () async {
@@ -49,6 +89,7 @@ class SessionScreen extends StatelessWidget {
                     ),
                   ),
                 ),
+              ],
             ],
           ),
         );
@@ -117,6 +158,71 @@ class SessionScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildSleepTimeSection(
+    BuildContext context,
+    Session session,
+    SessionProvider provider,
+  ) {
+    return Card(
+      child: Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Sleep Time',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.bedtime),
+                SizedBox(width: 8),
+                Text(
+                  session.sleepTime != null
+                      ? DateFormat('MMM dd, yyyy HH:mm').format(session.sleepTime!)
+                      : 'Not set',
+                ),
+                Spacer(),
+                TextButton(
+                  onPressed: () async {
+                    final DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: session.sleepTime ?? DateTime.now(),
+                      firstDate: session.wakeUpTime,
+                      lastDate: DateTime.now().add(Duration(days: 1)),
+                    );
+                    if (picked != null) {
+                      final TimeOfDay? time = await showTimePicker(
+                        context: context,
+                        initialTime: TimeOfDay.fromDateTime(
+                          session.sleepTime ?? DateTime.now(),
+                        ),
+                      );
+                      if (time != null) {
+                        final newDateTime = DateTime(
+                          picked.year,
+                          picked.month,
+                          picked.day,
+                          time.hour,
+                          time.minute,
+                        );
+                        await provider.updateCurrentSession(
+                          session.copyWith(sleepTime: newDateTime),
+                        );
+                      }
+                    }
+                  },
+                  child: Text('Change'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildPeeSection(
     BuildContext context,
     Session session,
@@ -160,7 +266,7 @@ class SessionScreen extends StatelessWidget {
                   session.copyWith(peeRemarks: value),
                 );
               },
-              controller: TextEditingController(text: session.peeRemarks),
+              controller: _peeRemarksController,
             ),
           ],
         ),
@@ -168,7 +274,11 @@ class SessionScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPoopSection(BuildContext context, Session session, SessionProvider provider) {
+  Widget _buildPoopSection(
+    BuildContext context,
+    Session session,
+    SessionProvider provider,
+  ) {
     return Card(
       child: Padding(
         padding: EdgeInsets.all(16.0),
@@ -185,7 +295,7 @@ class SessionScreen extends StatelessWidget {
               return ChoiceChip(
                 label: Text(amount.name),
                 selected: session.poopAmount == amount,
-                onSelected: (selected) {
+                onSelected: (bool selected) {
                   if (selected) {
                     provider.updateCurrentSession(
                       session.copyWith(poopAmount: amount),
@@ -195,15 +305,15 @@ class SessionScreen extends StatelessWidget {
               );
             }).toList(),
           ),
-          SizedBox(height: 8),
           Text('Consistency'),
+          SizedBox(height: 8),
           Wrap(
             spacing: 8.0,
             children: PoopConsistency.values.map((consistency) {
               return ChoiceChip(
                 label: Text(consistency.name),
                 selected: session.poopConsistency == consistency,
-                onSelected: (selected) {
+                onSelected: (bool selected) {
                   if (selected) {
                     provider.updateCurrentSession(
                       session.copyWith(poopConsistency: consistency),
@@ -213,15 +323,15 @@ class SessionScreen extends StatelessWidget {
               );
             }).toList(),
           ),
-          SizedBox(height: 8),
           Text('Color'),
+          SizedBox(height: 8),
           Wrap(
             spacing: 8.0,
             children: PoopColor.values.map((color) {
               return ChoiceChip(
                 label: Text(color.name),
                 selected: session.poopColor == color,
-                onSelected: (selected) {
+                onSelected: (bool selected) {
                   if (selected) {
                     provider.updateCurrentSession(
                       session.copyWith(poopColor: color),
@@ -233,70 +343,40 @@ class SessionScreen extends StatelessWidget {
           ),
           if (session.poopColor == PoopColor.abnormal) ...[
             SizedBox(height: 8),
-            if (session.poopColor == PoopColor.abnormal) ...[
-              SizedBox(height: 8),
-              if (session.abnormalPoopPhotoPath != null)
-                Column(
-                  children: [
-                    Image.file(
-                      File(session.abnormalPoopPhotoPath!),
-                      height: 200,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
-                    SizedBox(height: 8),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        provider.updateCurrentSession(
-                          session.copyWith(abnormalPoopPhotoPath: null),
-                        );
-                      },
-                      icon: Icon(Icons.delete),
-                      label: Text('Remove Photo'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ],
-                )
-              else
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: () async {
-                        final ImagePicker picker = ImagePicker();
-                        final XFile? image = await picker.pickImage(
-                          source: ImageSource.camera,
-                        );
-                        if (image != null) {
-                          provider.updateCurrentSession(
-                            session.copyWith(abnormalPoopPhotoPath: image.path),
-                          );
-                        }
-                      },
-                      icon: Icon(Icons.camera_alt),
-                      label: Text('Camera'),
-                    ),
-                    ElevatedButton.icon(
-                      onPressed: () async {
-                        final ImagePicker picker = ImagePicker();
-                        final XFile? image = await picker.pickImage(
-                          source: ImageSource.gallery,
-                        );
-                        if (image != null) {
-                          provider.updateCurrentSession(
-                            session.copyWith(abnormalPoopPhotoPath: image.path),
-                          );
-                        }
-                      },
-                      icon: Icon(Icons.photo_library),
-                      label: Text('Gallery'),
-                    ),
-                  ],
-                ),
-            ],
+            if (!session.hasAbnormalPoopPhoto)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      final ImagePicker picker = ImagePicker();
+                      final XFile? image = await picker.pickImage(
+                        source: ImageSource.camera,
+                      );
+                      if (image != null) {
+                        await provider.saveAbnormalPoopPhoto(session, image);
+                      }
+                    },
+                    icon: Icon(Icons.camera_alt),
+                    label: Text('Camera'),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      final ImagePicker picker = ImagePicker();
+                      final XFile? image = await picker.pickImage(
+                        source: ImageSource.gallery,
+                      );
+                      if (image != null) {
+                        await provider.saveAbnormalPoopPhoto(session, image);
+                      }
+                    },
+                    icon: Icon(Icons.photo_library),
+                    label: Text('Gallery'),
+                  ),
+                ],
+              )
+            else
+              _buildPoopPhotoSection(context, session, provider),
           ],
         ]),
       ),
@@ -331,9 +411,7 @@ class SessionScreen extends StatelessWidget {
                   session.copyWith(milkIntake: intake),
                 );
               },
-              controller: TextEditingController(
-                text: session.milkIntake.toString(),
-              ),
+              controller: _milkIntakeController,
             ),
           ],
         ),
@@ -370,6 +448,41 @@ class SessionScreen extends StatelessWidget {
     );
   }
 
+  Future<Widget> _buildPhotoDisplay(
+    BuildContext context,
+    String relativePath,
+    SessionProvider provider,
+  ) async {
+    print('Building photo display for relative path: $relativePath');
+    final photoDir = await provider.photoDirectory;
+    final fullPath = path.join(photoDir, relativePath);
+    print('Full photo path constructed: $fullPath');
+    
+    final file = File(fullPath);
+    if (await file.exists()) {
+      final size = await file.length();
+      print('Photo file exists at $fullPath with size: $size bytes');
+      return Image.file(
+        file,
+        height: 200,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          print('Error loading image: $error'); // Debug log
+          return Container(
+            height: 200,
+            width: double.infinity,
+            color: Colors.grey[300],
+            child: Center(child: Text('Failed to load image')),
+          );
+        },
+      );
+    } else {
+      print('Photo file not found at: $fullPath');
+      return const Center(child: CircularProgressIndicator());
+    }
+  }
+
   Widget _buildPhotoSection(
     BuildContext context,
     Session session,
@@ -386,32 +499,38 @@ class SessionScreen extends StatelessWidget {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             SizedBox(height: 8),
-            if (session.sessionPhotoPath != null)
-              Column(
-                children: [
-                  Image.file(
-                    File(session.sessionPhotoPath!),
-                    height: 200,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                  ),
-                  if (!session.isClosed) ...[
-                    SizedBox(height: 8),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        provider.updateCurrentSession(
-                          session.copyWith(sessionPhotoPath: null),
-                        );
-                      },
-                      icon: Icon(Icons.delete),
-                      label: Text('Remove Photo'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ],
-                ],
+            if (session.hasSessionPhoto && session.sessionPhotoPath != null)
+              FutureBuilder<Widget>(
+                future: _buildPhotoDisplay(context, session.sessionPhotoPath!, provider),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasData) {
+                    return Column(
+                      children: [
+                        snapshot.data!,
+                        if (!session.isClosed) ...[
+                          SizedBox(height: 8),
+                          ElevatedButton.icon(
+                            onPressed: () async {
+                              await provider.removeSessionPhoto(session);
+                            },
+                            icon: Icon(Icons.delete),
+                            label: Text('Remove Photo'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ],
+                    );
+                  }
+                  // If the image doesn't exist, remove it from the session
+                  provider.removeSessionPhoto(session);
+                  return const SizedBox.shrink();
+                },
               )
             else if (!session.isClosed)
               Row(
@@ -424,9 +543,7 @@ class SessionScreen extends StatelessWidget {
                         source: ImageSource.camera,
                       );
                       if (image != null) {
-                        provider.updateCurrentSession(
-                          session.copyWith(sessionPhotoPath: image.path),
-                        );
+                        await provider.saveSessionPhoto(session, image);
                       }
                     },
                     icon: Icon(Icons.camera_alt),
@@ -439,9 +556,7 @@ class SessionScreen extends StatelessWidget {
                         source: ImageSource.gallery,
                       );
                       if (image != null) {
-                        provider.updateCurrentSession(
-                          session.copyWith(sessionPhotoPath: image.path),
-                        );
+                        await provider.saveSessionPhoto(session, image);
                       }
                     },
                     icon: Icon(Icons.photo_library),
@@ -452,6 +567,47 @@ class SessionScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildPoopPhotoSection(
+    BuildContext context,
+    Session session,
+    SessionProvider provider,
+  ) {
+    if (!session.hasAbnormalPoopPhoto || session.abnormalPoopPhotoPath == null) {
+      return const SizedBox.shrink();
+    }
+
+    return FutureBuilder<Widget>(
+      future: _buildPhotoDisplay(context, session.abnormalPoopPhotoPath!, provider),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasData) {
+          return Column(
+            children: [
+              snapshot.data!,
+              SizedBox(height: 8),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  await provider.removeAbnormalPoopPhoto(session);
+                },
+                icon: Icon(Icons.delete),
+                label: Text('Remove Photo'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          );
+        }
+        // If the image doesn't exist, remove it from the session
+        provider.removeAbnormalPoopPhoto(session);
+        return const SizedBox.shrink();
+      },
     );
   }
 }
