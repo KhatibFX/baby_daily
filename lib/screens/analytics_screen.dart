@@ -5,6 +5,7 @@ import '../providers/session_provider.dart';
 import 'package:intl/intl.dart';
 import 'dart:math';
 import 'dart:io';
+import 'package:path/path.dart' as path;
 
 class AnalyticsScreen extends StatefulWidget {
   @override
@@ -220,35 +221,51 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             SizedBox(height: 8),
-            FutureBuilder<bool>(
-              future: File(randomSession.sessionPhotoPath!).exists(),
-              builder: (context, snapshot) {
-                if (snapshot.data == true) {
-                  return Column(
-                    children: [
-                      Image.file(
-                        File(randomSession.sessionPhotoPath!),
-                        height: 200,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
+            FutureBuilder<String>(
+              future: Provider.of<SessionProvider>(context).photoDirectory,
+              builder: (context, pathSnapshot) {
+                if (!pathSnapshot.hasData) {
+                  return CircularProgressIndicator();
+                }
+
+                final fullPath = path.join(
+                  pathSnapshot.data!,
+                  randomSession.sessionPhotoPath!,
+                );
+
+                return FutureBuilder<bool>(
+                  future: File(fullPath).exists(),
+                  builder: (context, snapshot) {
+                    if (snapshot.data == true) {
+                      return Column(
+                        children: [
+                          Image.file(
+                            File(fullPath),
                             height: 200,
                             width: double.infinity,
-                            color: Colors.grey[300],
-                            child: Center(child: Text('Failed to load image')),
-                          );
-                        },
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        DateFormat('MMM dd, yyyy HH:mm').format(randomSession.wakeUpTime),
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  );
-                }
-                return const SizedBox.shrink();
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              print('Error loading image at $fullPath: $error');
+                              return Container(
+                                height: 200,
+                                width: double.infinity,
+                                color: Colors.grey[300],
+                                child: Center(child: Text('Failed to load image')),
+                              );
+                            },
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            DateFormat('MMM dd, yyyy HH:mm').format(randomSession.wakeUpTime),
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      );
+                    }
+                    print('Photo file not found at: $fullPath');
+                    return const SizedBox.shrink();
+                  },
+                );
               },
             ),
           ],

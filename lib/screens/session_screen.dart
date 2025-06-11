@@ -62,35 +62,43 @@ class _SessionScreenState extends State<SessionScreen> {
           }
         });
 
-        return SingleChildScrollView(
-          padding: EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildWakeUpTimeSection(context, session, sessionProvider),
-              _buildPeeSection(context, session, sessionProvider),
-              _buildPoopSection(context, session, sessionProvider),
-              _buildMilkSection(context, session, sessionProvider),
-              _buildVitaminSection(context, session, sessionProvider),
-              _buildPhotoSection(context, session, sessionProvider),
-              SizedBox(height: 20),
-              if (!session.isClosed) ...[
-                _buildSleepTimeSection(context, session, sessionProvider),
+        return GestureDetector(
+          onTap: () {
+            // Hide keyboard when tapping outside text fields
+            FocusScope.of(context).unfocus();
+          },
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(16.0),
+            // Hide keyboard when scrolling
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildWakeUpTimeSection(context, session, sessionProvider),
+                _buildPeeSection(context, session, sessionProvider),
+                _buildPoopSection(context, session, sessionProvider),
+                _buildMilkSection(context, session, sessionProvider),
+                _buildVitaminSection(context, session, sessionProvider),
+                _buildPhotoSection(context, session, sessionProvider),
                 SizedBox(height: 20),
-                Center(
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      await sessionProvider.closeCurrentSession();
-                    },
-                    child: Text('Close Session'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
+                if (!session.isClosed) ...[
+                  _buildSleepTimeSection(context, session, sessionProvider),
+                  SizedBox(height: 20),
+                  Center(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        await sessionProvider.closeCurrentSession();
+                      },
+                      child: Text('Close Session'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                      ),
                     ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
         );
       },

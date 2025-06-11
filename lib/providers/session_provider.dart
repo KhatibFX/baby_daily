@@ -123,8 +123,31 @@ class SessionProvider with ChangeNotifier {
   }
 
   Future<void> updateSession(Session session) async {
-    await _db.updateSession(session);
-    await loadSessions();
+    if (!session.isClosed) {
+      _currentSession = session;
+      await _db.updateSession(session);
+    } else {
+      // Create a new editing session based on this one
+      final editingSession = session.copyWith(
+        id: null,
+        isClosed: false,
+        wakeUpTime: session.wakeUpTime,
+        pee: session.pee,
+        peeRemarks: session.peeRemarks,
+        poopAmount: session.poopAmount,
+        poopConsistency: session.poopConsistency,
+        poopColor: session.poopColor,
+        abnormalPoopPhotoPath: session.abnormalPoopPhotoPath,
+        hasAbnormalPoopPhoto: session.hasAbnormalPoopPhoto,
+        milkIntake: session.milkIntake,
+        vitaminAD: session.vitaminAD,
+        sleepTime: session.sleepTime,
+        sessionPhotoPath: session.sessionPhotoPath,
+        hasSessionPhoto: session.hasSessionPhoto,
+      );
+      _currentSession = await _db.createSession(editingSession);
+    }
+    notifyListeners();
   }
 
   Future<List<Session>> getClosedSessionsInRange(DateTime start, DateTime end) async {
