@@ -104,10 +104,9 @@ class SessionProvider with ChangeNotifier {
   Future<void> closeCurrentSession() async {
     if (_currentSession == null) return;
 
+    // Sleep time must be set before closing
     if (_currentSession?.sleepTime == null) {
-      await updateCurrentSession(
-        _currentSession!.copyWith(sleepTime: DateTime.now()),
-      );
+      return;
     }
 
     final closedSession = _currentSession!.copyWith(
@@ -325,5 +324,21 @@ class SessionProvider with ChangeNotifier {
       return _sessions[index - 1]; // Sessions are ordered by wakeUpTime DESC
     }
     return null;
+  }
+
+  Future<void> deleteSession(Session session) async {
+    // Delete associated photos if they exist
+    if (session.hasSessionPhoto && session.sessionPhotoPath != null) {
+      await _deletePhotoFile(session.sessionPhotoPath!);
+    }
+    if (session.hasAbnormalPoopPhoto && session.abnormalPoopPhotoPath != null) {
+      await _deletePhotoFile(session.abnormalPoopPhotoPath!);
+    }
+
+    // Delete from database
+    await _db.deleteSession(session.id!);
+    
+    // Reload sessions
+    await loadSessions();
   }
 }

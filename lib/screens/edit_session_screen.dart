@@ -224,6 +224,23 @@ class _EditSessionScreenState extends State<EditSessionScreen> {
                 TextButton(
                   onPressed: () async {
                     final provider = Provider.of<SessionProvider>(context, listen: false);
+                    final now = DateTime.now();
+                    final truncatedTime = DateTime(
+                      now.year, now.month, now.day, now.hour, now.minute
+                    );
+                    if (_isValidWakeUpTime(truncatedTime, provider)) {
+                      setState(() {
+                        _editingSession = _editingSession.copyWith(wakeUpTime: truncatedTime);
+                        _markAsChanged();
+                      });
+                    }
+                  },
+                  child: Text('Now'),
+                ),
+                SizedBox(width: 8),
+                TextButton(
+                  onPressed: () async {
+                    final provider = Provider.of<SessionProvider>(context, listen: false);
                     final prevSession = provider.getPreviousSession(_editingSession);
                     
                     // Set first date based on previous session's sleep time or 7 days ago
@@ -721,6 +738,23 @@ class _EditSessionScreenState extends State<EditSessionScreen> {
                       : 'Not set',
                 ),
                 Spacer(),
+                TextButton(
+                  onPressed: () async {
+                    final provider = Provider.of<SessionProvider>(context, listen: false);
+                    final now = DateTime.now();
+                    final truncatedTime = DateTime(
+                      now.year, now.month, now.day, now.hour, now.minute
+                    );
+                    if (_isValidSleepTime(truncatedTime, provider)) {
+                      setState(() {
+                        _editingSession = _editingSession.copyWith(sleepTime: truncatedTime);
+                        _markAsChanged();
+                      });
+                    }
+                  },
+                  child: Text('Now'),
+                ),
+                SizedBox(width: 8),
                 TextButton(
                   onPressed: () async {
                     final provider = Provider.of<SessionProvider>(context, listen: false);

@@ -98,15 +98,56 @@ class SessionHistoryScreen extends StatelessWidget {
                 if (session.poopColor == PoopColor.abnormal && session.hasAbnormalPoopPhoto)
                   _buildPhotoSection(context, session.abnormalPoopPhotoPath, 'Abnormal Poop Photo'),
                 SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => EditSessionScreen(originalSession: session),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => EditSessionScreen(originalSession: session),
+                          ),
+                        );
+                      },
+                      child: Text('Edit Session'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: Text('Delete Session'),
+                            content: Text('Are you sure you want to delete this session? This action cannot be undone.'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(false),
+                                child: Text('Cancel'),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(true),
+                                child: Text('Delete'),
+                                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                              ),
+                            ],
+                          ),
+                        );
+                        
+                        if (confirm == true) {
+                          await provider.deleteSession(session);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Session deleted')),
+                            );
+                          }
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
                       ),
-                    );
-                  },
-                  child: Text('Edit Session'),
+                      child: Text('Delete Session'),
+                    ),
+                  ],
                 ),
               ],
             ),

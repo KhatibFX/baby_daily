@@ -48,11 +48,14 @@ class _SessionScreenState extends State<SessionScreen> {
       }
     }
     
-    // Rule 2: Can't be after current session's sleep time or now
-    if (session.sleepTime != null && time.isAfter(session.sleepTime!)) {
-      _showTimeValidationError(context,
-          'Wake-up time cannot be after the session\'s sleep time');
-      return false;
+    // Rule 2: Can't be after current session's sleep time (if set)
+    // We skip this validation if sleep time is not set, allowing wake-up time to be modified freely
+    if (session.sleepTime != null) {
+      if (time.isAfter(session.sleepTime!)) {
+        _showTimeValidationError(context,
+            'Wake-up time cannot be after the session\'s sleep time');
+        return false;
+      }
     }
     
     if (time.isAfter(DateTime.now())) {
@@ -119,11 +122,6 @@ class _SessionScreenState extends State<SessionScreen> {
           );
         }
 
-        // Update sleep time and controllers when session changes
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          sessionProvider.updateDefaultSleepTime();
-        });
-
         // Update controllers when session changes
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (_peeRemarksController.text != session.peeRemarks) {
@@ -159,6 +157,15 @@ class _SessionScreenState extends State<SessionScreen> {
                   Center(
                     child: ElevatedButton(
                       onPressed: () async {
+                        if (session.sleepTime == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Please set a sleep time before closing the session'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                          return;
+                        }
                         await sessionProvider.closeCurrentSession();
                       },
                       child: Text('Close Session'),
@@ -201,6 +208,22 @@ class _SessionScreenState extends State<SessionScreen> {
                   DateFormat('MMM dd, yyyy HH:mm').format(session.wakeUpTime),
                 ),
                 Spacer(),
+                TextButton(
+                  onPressed: () async {
+                    final now = DateTime.now();
+                    // Set seconds to 0 for cleaner time
+                    final timeWithoutSeconds = DateTime(
+                      now.year, now.month, now.day, now.hour, now.minute
+                    );
+                    if (await _isValidWakeUpTime(timeWithoutSeconds, session, provider)) {
+                      await provider.updateCurrentSession(
+                        session.copyWith(wakeUpTime: timeWithoutSeconds),
+                      );
+                    }
+                  },
+                  child: Text('Now'),
+                ),
+                SizedBox(width: 8),
                 TextButton(
                   onPressed: () async {
                     final DateTime? picked = await showDatePicker(
@@ -266,6 +289,18 @@ class _SessionScreenState extends State<SessionScreen> {
                       : 'Not set',
                 ),
                 Spacer(),
+                TextButton(
+                  onPressed: () async {
+                    final now = DateTime.now();
+                    if (await _isValidSleepTime(now, session, provider)) {
+                      await provider.updateCurrentSession(
+                        session.copyWith(sleepTime: now),
+                      );
+                    }
+                  },
+                  child: Text('Now'),
+                ),
+                SizedBox(width: 8),
                 TextButton(
                   onPressed: () async {
                     final DateTime? picked = await showDatePicker(
