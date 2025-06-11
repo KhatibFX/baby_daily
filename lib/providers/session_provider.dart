@@ -308,4 +308,22 @@ class SessionProvider with ChangeNotifier {
     final absolutePath = await _getAbsolutePath(photoPath);
     return await _deletePhotoFile(absolutePath);
   }
+
+  // Get the session that occurred before the given session
+  Session? getPreviousSession(Session session) {
+    final index = _sessions.indexWhere((s) => s.id == session.id);
+    if (index != -1 && index < _sessions.length - 1) {
+      return _sessions[index + 1]; // Sessions are ordered by wakeUpTime DESC
+    }
+    return null;
+  }
+
+  // Get the session that occurred after the given session
+  Session? getNextSession(Session session) {
+    final index = _sessions.indexWhere((s) => s.id == session.id);
+    if (index > 0) {
+      return _sessions[index - 1]; // Sessions are ordered by wakeUpTime DESC
+    }
+    return null;
+  }
 }

@@ -32,6 +32,78 @@ class _SessionScreenState extends State<SessionScreen> {
     super.dispose();
   }
 
+  Future<bool> _isValidWakeUpTime(
+    DateTime time,
+    Session session,
+    SessionProvider provider,
+  ) async {
+    final previousSession = await provider.getPreviousSession(session);
+    
+    // Rule 1: Can't be before previous session's sleep time
+    if (previousSession != null && previousSession.sleepTime != null) {
+      if (time.isBefore(previousSession.sleepTime!)) {
+        _showTimeValidationError(context, 
+          'Wake-up time cannot be before previous session\'s sleep time');
+        return false;
+      }
+    }
+    
+    // Rule 2: Can't be after current session's sleep time or now
+    if (session.sleepTime != null && time.isAfter(session.sleepTime!)) {
+      _showTimeValidationError(context,
+          'Wake-up time cannot be after the session\'s sleep time');
+      return false;
+    }
+    
+    if (time.isAfter(DateTime.now())) {
+      _showTimeValidationError(context,
+          'Wake-up time cannot be in the future');
+      return false;
+    }
+    
+    return true;
+  }
+
+  Future<bool> _isValidSleepTime(
+    DateTime time,
+    Session session,
+    SessionProvider provider,
+  ) async {
+    // Rule 3: Can't be before current session's wake-up time
+    if (time.isBefore(session.wakeUpTime)) {
+      _showTimeValidationError(context,
+          'Sleep time cannot be before the session\'s wake-up time');
+      return false;
+    }
+
+    // Rule 4: Can't be after next session's wake-up time or now
+    final nextSession = await provider.getNextSession(session);
+    if (nextSession != null) {
+      if (time.isAfter(nextSession.wakeUpTime)) {
+        _showTimeValidationError(context,
+            'Sleep time cannot be after next session\'s wake-up time');
+        return false;
+      }
+    }
+
+    if (time.isAfter(DateTime.now())) {
+      _showTimeValidationError(context,
+          'Sleep time cannot be in the future');
+      return false;
+    }
+
+    return true;
+  }
+
+  void _showTimeValidationError(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<SessionProvider>(
@@ -150,9 +222,11 @@ class _SessionScreenState extends State<SessionScreen> {
                           time.hour,
                           time.minute,
                         );
-                        await provider.updateCurrentSession(
-                          session.copyWith(wakeUpTime: newDateTime),
-                        );
+                        if (await _isValidWakeUpTime(newDateTime, session, provider)) {
+                          await provider.updateCurrentSession(
+                            session.copyWith(wakeUpTime: newDateTime),
+                          );
+                        }
                       }
                     }
                   },
@@ -215,9 +289,11 @@ class _SessionScreenState extends State<SessionScreen> {
                           time.hour,
                           time.minute,
                         );
-                        await provider.updateCurrentSession(
-                          session.copyWith(sleepTime: newDateTime),
-                        );
+                        if (await _isValidSleepTime(newDateTime, session, provider)) {
+                          await provider.updateCurrentSession(
+                            session.copyWith(sleepTime: newDateTime),
+                          );
+                        }
                       }
                     }
                   },

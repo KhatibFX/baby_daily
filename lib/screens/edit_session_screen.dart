@@ -32,6 +32,55 @@ class _EditSessionScreenState extends State<EditSessionScreen> {
     _milkIntakeController = TextEditingController(text: _editingSession.milkIntake.toString());
   }
 
+  bool _isValidWakeUpTime(DateTime time, SessionProvider provider) {
+    // Can't be after now
+    if (time.isAfter(DateTime.now())) {
+      return false;
+    }
+
+    // Can't be after sleep time if it exists
+    if (_editingSession.sleepTime != null && time.isAfter(_editingSession.sleepTime!)) {
+      return false;
+    }
+
+    // Can't be before previous session's sleep time
+    final prevSession = provider.getPreviousSession(_editingSession);
+    if (prevSession?.sleepTime != null && time.isBefore(prevSession!.sleepTime!)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  bool _isValidSleepTime(DateTime time, SessionProvider provider) {
+    // Can't be after now
+    if (time.isAfter(DateTime.now())) {
+      return false;
+    }
+
+    // Can't be before wake up time
+    if (time.isBefore(_editingSession.wakeUpTime)) {
+      return false;
+    }
+
+    // Can't be after next session's wake up time
+    final nextSession = provider.getNextSession(_editingSession);
+    if (nextSession != null && time.isAfter(nextSession.wakeUpTime)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  void _showTimeValidationError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _peeRemarksController.dispose();
@@ -174,11 +223,21 @@ class _EditSessionScreenState extends State<EditSessionScreen> {
                 Spacer(),
                 TextButton(
                   onPressed: () async {
+                    final provider = Provider.of<SessionProvider>(context, listen: false);
+                    final prevSession = provider.getPreviousSession(_editingSession);
+                    
+                    // Set first date based on previous session's sleep time or 7 days ago
+                    final firstDate = prevSession?.sleepTime ?? 
+                        DateTime.now().subtract(Duration(days: 7));
+                    
+                    // Set last date based on current session's sleep time or now
+                    final lastDate = _editingSession.sleepTime ?? DateTime.now();
+                    
                     final DateTime? picked = await showDatePicker(
                       context: context,
                       initialDate: _editingSession.wakeUpTime,
-                      firstDate: DateTime.now().subtract(Duration(days: 7)),
-                      lastDate: DateTime.now(),
+                      firstDate: firstDate,
+                      lastDate: lastDate,
                     );
                     if (picked != null) {
                       final TimeOfDay? time = await showTimePicker(
@@ -193,10 +252,18 @@ class _EditSessionScreenState extends State<EditSessionScreen> {
                           time.hour,
                           time.minute,
                         );
-                        setState(() {
-                          _editingSession = _editingSession.copyWith(wakeUpTime: newDateTime);
-                          _markAsChanged();
-                        });
+                        
+                        if (_isValidWakeUpTime(newDateTime, provider)) {
+                          setState(() {
+                            _editingSession = _editingSession.copyWith(wakeUpTime: newDateTime);
+                            _markAsChanged();
+                          });
+                        } else {
+                          _showTimeValidationError(
+                            'Invalid wake up time. Must be after previous session\'s sleep time'
+                            ' and before current session\'s sleep time.'
+                          );
+                        }
                       }
                     }
                   },
@@ -656,11 +723,20 @@ class _EditSessionScreenState extends State<EditSessionScreen> {
                 Spacer(),
                 TextButton(
                   onPressed: () async {
+                    final provider = Provider.of<SessionProvider>(context, listen: false);
+                    final nextSession = provider.getNextSession(_editingSession);
+                    
+                    // Sleep time must be after wake up time
+                    final firstDate = _editingSession.wakeUpTime;
+                    
+                    // Sleep time must be before next session's wake up time or now
+                    final lastDate = nextSession?.wakeUpTime ?? DateTime.now();
+                    
                     final DateTime? picked = await showDatePicker(
                       context: context,
                       initialDate: _editingSession.sleepTime ?? DateTime.now(),
-                      firstDate: _editingSession.wakeUpTime,
-                      lastDate: DateTime.now().add(Duration(days: 1)),
+                      firstDate: firstDate,
+                      lastDate: lastDate,
                     );
                     if (picked != null) {
                       final TimeOfDay? time = await showTimePicker(
@@ -677,10 +753,18 @@ class _EditSessionScreenState extends State<EditSessionScreen> {
                           time.hour,
                           time.minute,
                         );
-                        setState(() {
-                          _editingSession = _editingSession.copyWith(sleepTime: newDateTime);
-                          _markAsChanged();
-                        });
+                        
+                        if (_isValidSleepTime(newDateTime, provider)) {
+                          setState(() {
+                            _editingSession = _editingSession.copyWith(sleepTime: newDateTime);
+                            _markAsChanged();
+                          });
+                        } else {
+                          _showTimeValidationError(
+                            'Invalid sleep time. Must be after wake up time'
+                            ' and before the next session\'s wake up time.'
+                          );
+                        }
                       }
                     }
                   },
