@@ -20,7 +20,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -33,11 +33,14 @@ class DatabaseService {
         wakeUpTime TEXT NOT NULL,
         pee INTEGER NOT NULL,
         peeRemarks TEXT,
+        peeTime TEXT,
         poopAmount INTEGER NOT NULL,
         poopConsistency INTEGER NOT NULL,
         poopColor INTEGER NOT NULL,
+        poopTime TEXT,
         abnormalPoopPhotoPath TEXT,
         milkIntake INTEGER NOT NULL,
+        milkTime TEXT,
         vitaminAD INTEGER NOT NULL,
         sleepTime TEXT,
         sessionPhotoPath TEXT,
@@ -54,6 +57,11 @@ class DatabaseService {
       await db.execute('ALTER TABLE sessions ADD COLUMN hasAbnormalPoopPhoto INTEGER NOT NULL DEFAULT 0');
       await db.execute('UPDATE sessions SET hasSessionPhoto = CASE WHEN sessionPhotoPath IS NOT NULL THEN 1 ELSE 0 END');
       await db.execute('UPDATE sessions SET hasAbnormalPoopPhoto = CASE WHEN abnormalPoopPhotoPath IS NOT NULL THEN 1 ELSE 0 END');
+    }
+    if (oldVersion < 3) {
+      await db.execute('ALTER TABLE sessions ADD COLUMN peeTime TEXT');
+      await db.execute('ALTER TABLE sessions ADD COLUMN poopTime TEXT');
+      await db.execute('ALTER TABLE sessions ADD COLUMN milkTime TEXT');
     }
   }
 

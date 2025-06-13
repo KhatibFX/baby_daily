@@ -3,11 +3,13 @@ import 'package:path/path.dart' as path;
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
+// intl import has been moved to session_widgets.dart
 import 'package:provider/provider.dart';
 
 import '../models/session.dart';
 import '../providers/session_provider.dart';
+import '../shared/session_utils.dart';
+import '../shared/session_widgets.dart';
 
 class SessionScreen extends StatefulWidget {
   @override
@@ -30,81 +32,6 @@ class _SessionScreenState extends State<SessionScreen> {
     _peeRemarksController.dispose();
     _milkIntakeController.dispose();
     super.dispose();
-  }
-
-  Future<bool> _isValidWakeUpTime(
-    DateTime time,
-    Session session,
-    SessionProvider provider,
-  ) async {
-    final previousSession = await provider.getPreviousSession(session);
-    
-    // Rule 1: Can't be before previous session's sleep time
-    if (previousSession != null && previousSession.sleepTime != null) {
-      if (time.isBefore(previousSession.sleepTime!)) {
-        _showTimeValidationError(context, 
-          'Wake-up time cannot be before previous session\'s sleep time');
-        return false;
-      }
-    }
-    
-    // Rule 2: Can't be after current session's sleep time (if set)
-    // We skip this validation if sleep time is not set, allowing wake-up time to be modified freely
-    if (session.sleepTime != null) {
-      if (time.isAfter(session.sleepTime!)) {
-        _showTimeValidationError(context,
-            'Wake-up time cannot be after the session\'s sleep time');
-        return false;
-      }
-    }
-    
-    if (time.isAfter(DateTime.now())) {
-      _showTimeValidationError(context,
-          'Wake-up time cannot be in the future');
-      return false;
-    }
-    
-    return true;
-  }
-
-  Future<bool> _isValidSleepTime(
-    DateTime time,
-    Session session,
-    SessionProvider provider,
-  ) async {
-    // Rule 3: Can't be before current session's wake-up time
-    if (time.isBefore(session.wakeUpTime)) {
-      _showTimeValidationError(context,
-          'Sleep time cannot be before the session\'s wake-up time');
-      return false;
-    }
-
-    // Rule 4: Can't be after next session's wake-up time or now
-    final nextSession = await provider.getNextSession(session);
-    if (nextSession != null) {
-      if (time.isAfter(nextSession.wakeUpTime)) {
-        _showTimeValidationError(context,
-            'Sleep time cannot be after next session\'s wake-up time');
-        return false;
-      }
-    }
-
-    if (time.isAfter(DateTime.now())) {
-      _showTimeValidationError(context,
-          'Sleep time cannot be in the future');
-      return false;
-    }
-
-    return true;
-  }
-
-  void _showTimeValidationError(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
-    );
   }
 
   @override
@@ -200,62 +127,17 @@ class _SessionScreenState extends State<SessionScreen> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.access_time),
-                SizedBox(width: 8),
-                Text(
-                  DateFormat('MMM dd, yyyy HH:mm').format(session.wakeUpTime),
-                ),
-                Spacer(),
-                TextButton(
-                  onPressed: () async {
-                    final now = DateTime.now();
-                    // Set seconds to 0 for cleaner time
-                    final timeWithoutSeconds = DateTime(
-                      now.year, now.month, now.day, now.hour, now.minute
-                    );
-                    if (await _isValidWakeUpTime(timeWithoutSeconds, session, provider)) {
-                      await provider.updateCurrentSession(
-                        session.copyWith(wakeUpTime: timeWithoutSeconds),
-                      );
-                    }
-                  },
-                  child: Text('Now'),
-                ),
-                SizedBox(width: 8),
-                TextButton(
-                  onPressed: () async {
-                    final DateTime? picked = await showDatePicker(
-                      context: context,
-                      initialDate: session.wakeUpTime,
-                      firstDate: DateTime.now().subtract(Duration(days: 7)),
-                      lastDate: DateTime.now(),
-                    );
-                    if (picked != null) {
-                      final TimeOfDay? time = await showTimePicker(
-                        context: context,
-                        initialTime: TimeOfDay.fromDateTime(session.wakeUpTime),
-                      );
-                      if (time != null) {
-                        final newDateTime = DateTime(
-                          picked.year,
-                          picked.month,
-                          picked.day,
-                          time.hour,
-                          time.minute,
-                        );
-                        if (await _isValidWakeUpTime(newDateTime, session, provider)) {
-                          await provider.updateCurrentSession(
-                            session.copyWith(wakeUpTime: newDateTime),
-                          );
-                        }
-                      }
-                    }
-                  },
-                  child: Text('Change'),
-                ),
-              ],
+            TimePickerRow(
+              time: session.wakeUpTime,
+              placeholder: 'Not set',
+              firstDate: DateTime.now().subtract(Duration(days: 7)),
+              lastDate: DateTime.now(),
+              onValidate: (time) => isValidWakeUpTime(context, time, session, provider),
+              onTimeSelected: (time) async {
+                await provider.updateCurrentSession(
+                  session.copyWith(wakeUpTime: time),
+                );
+              },
             ),
           ],
         ),
@@ -279,62 +161,18 @@ class _SessionScreenState extends State<SessionScreen> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.bedtime),
-                SizedBox(width: 8),
-                Text(
-                  session.sleepTime != null
-                      ? DateFormat('MMM dd, yyyy HH:mm').format(session.sleepTime!)
-                      : 'Not set',
-                ),
-                Spacer(),
-                TextButton(
-                  onPressed: () async {
-                    final now = DateTime.now();
-                    if (await _isValidSleepTime(now, session, provider)) {
-                      await provider.updateCurrentSession(
-                        session.copyWith(sleepTime: now),
-                      );
-                    }
-                  },
-                  child: Text('Now'),
-                ),
-                SizedBox(width: 8),
-                TextButton(
-                  onPressed: () async {
-                    final DateTime? picked = await showDatePicker(
-                      context: context,
-                      initialDate: session.sleepTime ?? DateTime.now(),
-                      firstDate: session.wakeUpTime,
-                      lastDate: DateTime.now().add(Duration(days: 1)),
-                    );
-                    if (picked != null) {
-                      final TimeOfDay? time = await showTimePicker(
-                        context: context,
-                        initialTime: TimeOfDay.fromDateTime(
-                          session.sleepTime ?? DateTime.now(),
-                        ),
-                      );
-                      if (time != null) {
-                        final newDateTime = DateTime(
-                          picked.year,
-                          picked.month,
-                          picked.day,
-                          time.hour,
-                          time.minute,
-                        );
-                        if (await _isValidSleepTime(newDateTime, session, provider)) {
-                          await provider.updateCurrentSession(
-                            session.copyWith(sleepTime: newDateTime),
-                          );
-                        }
-                      }
-                    }
-                  },
-                  child: Text('Change'),
-                ),
-              ],
+            TimePickerRow(
+              time: session.sleepTime,
+              placeholder: 'Not set',
+              icon: Icons.bedtime,
+              firstDate: session.wakeUpTime,
+              lastDate: DateTime.now(),
+              onValidate: (time) => isValidSleepTime(context, time, session, provider),
+              onTimeSelected: (time) async {
+                await provider.updateCurrentSession(
+                  session.copyWith(sleepTime: time),
+                );
+              },
             ),
           ],
         ),
@@ -358,35 +196,54 @@ class _SessionScreenState extends State<SessionScreen> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             SizedBox(height: 8),
-            Wrap(
-              spacing: 8.0,
-              children: PeeAmount.values.map((amount) {
-                return ChoiceChip(
-                  label: Text(amount.name),
-                  selected: session.pee == amount,
-                  onSelected: (selected) {
-                    if (selected) {
-                      provider.updateCurrentSession(
-                        session.copyWith(pee: amount),
-                      );
-                    }
-                  },
-                );
-              }).toList(),
-            ),
-            SizedBox(height: 8),
-            TextField(
-              decoration: InputDecoration(
-                labelText: 'Remarks',
-                border: OutlineInputBorder(),
+            Container(
+              width: double.infinity,
+              child: Wrap(
+                spacing: 8.0,
+                children: PeeAmount.values.map((amount) {
+                  return ChoiceChip(
+                    label: Text(amount.name),
+                    selected: session.pee == amount,
+                    onSelected: (selected) {
+                      if (selected) {
+                        provider.updateCurrentSession(
+                          session.copyWith(pee: amount),
+                        );
+                      }
+                    },
+                  );
+                }).toList(),
               ),
-              onChanged: (value) {
-                provider.updateCurrentSession(
-                  session.copyWith(peeRemarks: value),
-                );
-              },
-              controller: _peeRemarksController,
             ),
+            if (session.pee != PeeAmount.na) ...[
+              SizedBox(height: 8),
+              TimePickerRow(
+                time: session.peeTime,
+                placeholder: 'Time not set',
+                icon: Icons.access_time,
+                firstDate: session.wakeUpTime,
+                lastDate: session.sleepTime ?? DateTime.now(),
+                onValidate: (time) => isValidActivityTime(context, time, session, provider),
+                onTimeSelected: (time) async {
+                  await provider.updateCurrentSession(
+                    session.copyWith(peeTime: time),
+                  );
+                },
+              ),
+              SizedBox(height: 8),
+              TextField(
+                decoration: InputDecoration(
+                  labelText: 'Remarks',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (value) {
+                  provider.updateCurrentSession(
+                    session.copyWith(peeRemarks: value),
+                  );
+                },
+                controller: _peeRemarksController,
+              ),
+            ],
           ],
         ),
       ),
@@ -401,103 +258,137 @@ class _SessionScreenState extends State<SessionScreen> {
     return Card(
       child: Padding(
         padding: EdgeInsets.all(16.0),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(
-            'Poop',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          SizedBox(height: 8),
-          Text('Amount'),
-          Wrap(
-            spacing: 8.0,
-            children: PoopAmount.values.map((amount) {
-              return ChoiceChip(
-                label: Text(amount.name),
-                selected: session.poopAmount == amount,
-                onSelected: (bool selected) {
-                  if (selected) {
-                    provider.updateCurrentSession(
-                      session.copyWith(poopAmount: amount),
-                    );
-                  }
-                },
-              );
-            }).toList(),
-          ),
-          Text('Consistency'),
-          SizedBox(height: 8),
-          Wrap(
-            spacing: 8.0,
-            children: PoopConsistency.values.map((consistency) {
-              return ChoiceChip(
-                label: Text(consistency.name),
-                selected: session.poopConsistency == consistency,
-                onSelected: (bool selected) {
-                  if (selected) {
-                    provider.updateCurrentSession(
-                      session.copyWith(poopConsistency: consistency),
-                    );
-                  }
-                },
-              );
-            }).toList(),
-          ),
-          Text('Color'),
-          SizedBox(height: 8),
-          Wrap(
-            spacing: 8.0,
-            children: PoopColor.values.map((color) {
-              return ChoiceChip(
-                label: Text(color.name),
-                selected: session.poopColor == color,
-                onSelected: (bool selected) {
-                  if (selected) {
-                    provider.updateCurrentSession(
-                      session.copyWith(poopColor: color),
-                    );
-                  }
-                },
-              );
-            }).toList(),
-          ),
-          if (session.poopColor == PoopColor.abnormal) ...[
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Poop',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             SizedBox(height: 8),
-            if (!session.hasAbnormalPoopPhoto)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: () async {
-                      final ImagePicker picker = ImagePicker();
-                      final XFile? image = await picker.pickImage(
-                        source: ImageSource.camera,
-                      );
-                      if (image != null) {
-                        await provider.saveAbnormalPoopPhoto(session, image);
+            Text('Amount'),
+            Container(
+              width: double.infinity,
+              child: Wrap(
+                spacing: 8.0,
+                children: PoopAmount.values.map((amount) {
+                  return ChoiceChip(
+                    label: Text(amount.name),
+                    selected: session.poopAmount == amount,
+                    onSelected: (bool selected) {
+                      if (selected) {
+                        // When amount is set to na, reset other poop-related fields
+                        provider.updateCurrentSession(
+                          session.copyWith(
+                            poopAmount: amount,
+                            poopConsistency: amount == PoopAmount.na ? PoopConsistency.normal : null,
+                            poopColor: amount == PoopAmount.na ? PoopColor.yellow : null,
+                            poopTime: amount == PoopAmount.na ? null : session.poopTime,
+                          ),
+                        );
                       }
                     },
-                    icon: Icon(Icons.camera_alt),
-                    label: Text('Camera'),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: () async {
-                      final ImagePicker picker = ImagePicker();
-                      final XFile? image = await picker.pickImage(
-                        source: ImageSource.gallery,
-                      );
-                      if (image != null) {
-                        await provider.saveAbnormalPoopPhoto(session, image);
-                      }
-                    },
-                    icon: Icon(Icons.photo_library),
-                    label: Text('Gallery'),
-                  ),
-                ],
-              )
-            else
-              _buildPoopPhotoSection(context, session, provider),
+                  );
+                }).toList(),
+              ),
+            ),
+            if (session.poopAmount != PoopAmount.na) ...[
+              SizedBox(height: 8),
+              TimePickerRow(
+                time: session.poopTime,
+                placeholder: 'Time not set',
+                icon: Icons.access_time,
+                firstDate: session.wakeUpTime,
+                lastDate: session.sleepTime ?? DateTime.now(),
+                onValidate: (time) => isValidActivityTime(context, time, session, provider),
+                onTimeSelected: (time) async {
+                  await provider.updateCurrentSession(
+                    session.copyWith(poopTime: time),
+                  );
+                },
+              ),
+              Text('Consistency'),
+              SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                child: Wrap(
+                  spacing: 8.0,
+                  children: PoopConsistency.values.map((consistency) {
+                    return ChoiceChip(
+                      label: Text(consistency.name),
+                      selected: session.poopConsistency == consistency,
+                      onSelected: (bool selected) {
+                        if (selected) {
+                          provider.updateCurrentSession(
+                            session.copyWith(poopConsistency: consistency),
+                          );
+                        }
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+              Text('Color'),
+              SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                child: Wrap(
+                  spacing: 8.0,
+                  children: PoopColor.values.map((color) {
+                    return ChoiceChip(
+                      label: Text(color.name),
+                      selected: session.poopColor == color,
+                      onSelected: (bool selected) {
+                        if (selected) {
+                          provider.updateCurrentSession(
+                            session.copyWith(poopColor: color),
+                          );
+                        }
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+              if (session.poopColor == PoopColor.abnormal) ...[
+                SizedBox(height: 8),
+                if (!session.hasAbnormalPoopPhoto)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          final ImagePicker picker = ImagePicker();
+                          final XFile? image = await picker.pickImage(
+                            source: ImageSource.camera,
+                          );
+                          if (image != null) {
+                            await provider.saveAbnormalPoopPhoto(session, image);
+                          }
+                        },
+                        icon: Icon(Icons.camera_alt),
+                        label: Text('Camera'),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          final ImagePicker picker = ImagePicker();
+                          final XFile? image = await picker.pickImage(
+                            source: ImageSource.gallery,
+                          );
+                          if (image != null) {
+                            await provider.saveAbnormalPoopPhoto(session, image);
+                          }
+                        },
+                        icon: Icon(Icons.photo_library),
+                        label: Text('Gallery'),
+                      ),
+                    ],
+                  )
+                else
+                  _buildPoopPhotoSection(context, session, provider),
+              ],
+            ],
           ],
-        ]),
+        ),
       ),
     );
   }
@@ -516,6 +407,20 @@ class _SessionScreenState extends State<SessionScreen> {
             Text(
               'Milk Intake (ml)',
               style: Theme.of(context).textTheme.titleLarge,
+            ),
+            SizedBox(height: 8),
+            TimePickerRow(
+              time: session.milkTime,
+              placeholder: 'Time not set',
+              icon: Icons.access_time,
+              firstDate: session.wakeUpTime,
+              lastDate: session.sleepTime ?? DateTime.now(),
+              onValidate: (time) => isValidActivityTime(context, time, session, provider),
+              onTimeSelected: (time) async {
+                await provider.updateCurrentSession(
+                  session.copyWith(milkTime: time),
+                );
+              },
             ),
             SizedBox(height: 8),
             TextField(

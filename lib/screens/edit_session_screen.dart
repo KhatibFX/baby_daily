@@ -1,12 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:path/path.dart' as path;
 
 import '../models/session.dart';
 import '../providers/session_provider.dart';
+import '../shared/session_utils.dart';
+import '../shared/session_widgets.dart';
 
 class EditSessionScreen extends StatefulWidget {
   final Session originalSession;
@@ -32,53 +33,12 @@ class _EditSessionScreenState extends State<EditSessionScreen> {
     _milkIntakeController = TextEditingController(text: _editingSession.milkIntake.toString());
   }
 
-  bool _isValidWakeUpTime(DateTime time, SessionProvider provider) {
-    // Can't be after now
-    if (time.isAfter(DateTime.now())) {
-      return false;
+  void _markAsChanged() {
+    if (!_hasChanges) {
+      setState(() {
+        _hasChanges = true;
+      });
     }
-
-    // Can't be after sleep time if it exists
-    if (_editingSession.sleepTime != null && time.isAfter(_editingSession.sleepTime!)) {
-      return false;
-    }
-
-    // Can't be before previous session's sleep time
-    final prevSession = provider.getPreviousSession(_editingSession);
-    if (prevSession?.sleepTime != null && time.isBefore(prevSession!.sleepTime!)) {
-      return false;
-    }
-
-    return true;
-  }
-
-  bool _isValidSleepTime(DateTime time, SessionProvider provider) {
-    // Can't be after now
-    if (time.isAfter(DateTime.now())) {
-      return false;
-    }
-
-    // Can't be before wake up time
-    if (time.isBefore(_editingSession.wakeUpTime)) {
-      return false;
-    }
-
-    // Can't be after next session's wake up time
-    final nextSession = provider.getNextSession(_editingSession);
-    if (nextSession != null && time.isAfter(nextSession.wakeUpTime)) {
-      return false;
-    }
-
-    return true;
-  }
-
-  void _showTimeValidationError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
-    );
   }
 
   @override
@@ -111,14 +71,6 @@ class _EditSessionScreenState extends State<EditSessionScreen> {
     );
     
     return result ?? false;
-  }
-
-  void _markAsChanged() {
-    if (!_hasChanges) {
-      setState(() {
-        _hasChanges = true;
-      });
-    }
   }
 
   @override
@@ -213,80 +165,27 @@ class _EditSessionScreenState extends State<EditSessionScreen> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.access_time),
-                SizedBox(width: 8),
-                Text(
-                  DateFormat('MMM dd, yyyy HH:mm').format(_editingSession.wakeUpTime),
-                ),
-                Spacer(),
-                TextButton(
-                  onPressed: () async {
-                    final provider = Provider.of<SessionProvider>(context, listen: false);
-                    final now = DateTime.now();
-                    final truncatedTime = DateTime(
-                      now.year, now.month, now.day, now.hour, now.minute
-                    );
-                    if (_isValidWakeUpTime(truncatedTime, provider)) {
-                      setState(() {
-                        _editingSession = _editingSession.copyWith(wakeUpTime: truncatedTime);
-                        _markAsChanged();
-                      });
-                    }
+            Consumer<SessionProvider>(
+              builder: (context, provider, child) {
+                final prevSession = provider.getPreviousSession(_editingSession);
+                final firstDate = prevSession?.sleepTime ?? DateTime.now().subtract(Duration(days: 7));
+                final lastDate = _editingSession.sleepTime ?? DateTime.now();
+
+                return TimePickerRow(
+                  time: _editingSession.wakeUpTime,
+                  placeholder: 'Not set',
+                  icon: Icons.access_time,
+                  firstDate: firstDate,
+                  lastDate: lastDate,
+                  onValidate: (time) => isValidWakeUpTime(context, time, _editingSession, provider),
+                  onTimeSelected: (time) {
+                    setState(() {
+                      _editingSession = _editingSession.copyWith(wakeUpTime: time);
+                      _markAsChanged();
+                    });
                   },
-                  child: Text('Now'),
-                ),
-                SizedBox(width: 8),
-                TextButton(
-                  onPressed: () async {
-                    final provider = Provider.of<SessionProvider>(context, listen: false);
-                    final prevSession = provider.getPreviousSession(_editingSession);
-                    
-                    // Set first date based on previous session's sleep time or 7 days ago
-                    final firstDate = prevSession?.sleepTime ?? 
-                        DateTime.now().subtract(Duration(days: 7));
-                    
-                    // Set last date based on current session's sleep time or now
-                    final lastDate = _editingSession.sleepTime ?? DateTime.now();
-                    
-                    final DateTime? picked = await showDatePicker(
-                      context: context,
-                      initialDate: _editingSession.wakeUpTime,
-                      firstDate: firstDate,
-                      lastDate: lastDate,
-                    );
-                    if (picked != null) {
-                      final TimeOfDay? time = await showTimePicker(
-                        context: context,
-                        initialTime: TimeOfDay.fromDateTime(_editingSession.wakeUpTime),
-                      );
-                      if (time != null) {
-                        final newDateTime = DateTime(
-                          picked.year,
-                          picked.month,
-                          picked.day,
-                          time.hour,
-                          time.minute,
-                        );
-                        
-                        if (_isValidWakeUpTime(newDateTime, provider)) {
-                          setState(() {
-                            _editingSession = _editingSession.copyWith(wakeUpTime: newDateTime);
-                            _markAsChanged();
-                          });
-                        } else {
-                          _showTimeValidationError(
-                            'Invalid wake up time. Must be after previous session\'s sleep time'
-                            ' and before current session\'s sleep time.'
-                          );
-                        }
-                      }
-                    }
-                  },
-                  child: Text('Change'),
-                ),
-              ],
+                );
+              },
             ),
           ],
         ),
@@ -306,35 +205,57 @@ class _EditSessionScreenState extends State<EditSessionScreen> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             SizedBox(height: 8),
-            Wrap(
-              spacing: 8.0,
-              children: PeeAmount.values.map((amount) {
-                return ChoiceChip(
-                  label: Text(amount.name),
-                  selected: _editingSession.pee == amount,
-                  onSelected: (selected) {
-                    if (selected) {
-                      setState(() {
-                        _editingSession = _editingSession.copyWith(pee: amount);
-                        _markAsChanged();
-                      });
-                    }
-                  },
-                );
-              }).toList(),
-            ),
-            SizedBox(height: 8),
-            TextField(
-              decoration: InputDecoration(
-                labelText: 'Remarks',
-                border: OutlineInputBorder(),
+            Container(
+              width: double.infinity,
+              child: Wrap(
+                spacing: 8.0,
+                children: PeeAmount.values.map((amount) {
+                  return ChoiceChip(
+                    label: Text(amount.name),
+                    selected: _editingSession.pee == amount,
+                    onSelected: (selected) {
+                      if (selected) {
+                        setState(() {
+                          _editingSession = _editingSession.copyWith(pee: amount);
+                          _markAsChanged();
+                        });
+                      }
+                    },
+                  );
+                }).toList(),
               ),
-              controller: _peeRemarksController,
-              onChanged: (value) {
-                _editingSession = _editingSession.copyWith(peeRemarks: value);
-                _markAsChanged();
-              },
             ),
+            if (_editingSession.pee != PeeAmount.na) ...[
+              SizedBox(height: 8),
+              Consumer<SessionProvider>(
+                builder: (context, provider, child) => TimePickerRow(
+                  time: _editingSession.peeTime,
+                  placeholder: 'Time not set',
+                  icon: Icons.access_time,
+                  firstDate: _editingSession.wakeUpTime,
+                  lastDate: _editingSession.sleepTime ?? DateTime.now(),
+                  onValidate: (time) => isValidActivityTime(context, time, _editingSession, provider),
+                  onTimeSelected: (time) {
+                    setState(() {
+                      _editingSession = _editingSession.copyWith(peeTime: time);
+                      _markAsChanged();
+                    });
+                  },
+                ),
+              ),
+              SizedBox(height: 8),
+              TextField(
+                decoration: InputDecoration(
+                  labelText: 'Remarks',
+                  border: OutlineInputBorder(),
+                ),
+                controller: _peeRemarksController,
+                onChanged: (value) {
+                  _editingSession = _editingSession.copyWith(peeRemarks: value);
+                  _markAsChanged();
+                },
+              ),
+            ],
           ],
         ),
       ),
@@ -354,117 +275,151 @@ class _EditSessionScreenState extends State<EditSessionScreen> {
             ),
             SizedBox(height: 8),
             Text('Amount'),
-            Wrap(
-              spacing: 8.0,
-              children: PoopAmount.values.map((amount) {
-                return ChoiceChip(
-                  label: Text(amount.name),
-                  selected: _editingSession.poopAmount == amount,
-                  onSelected: (selected) {
-                    if (selected) {
-                      setState(() {
-                        _editingSession = _editingSession.copyWith(poopAmount: amount);
-                        _markAsChanged();
-                      });
-                    }
-                  },
-                );
-              }).toList(),
+            Container(
+              width: double.infinity,
+              child: Wrap(
+                spacing: 8.0,
+                children: PoopAmount.values.map((amount) {
+                  return ChoiceChip(
+                    label: Text(amount.name),
+                    selected: _editingSession.poopAmount == amount,
+                    onSelected: (selected) {
+                      if (selected) {
+                        setState(() {
+                          // When amount is set to na, reset other poop-related fields
+                          _editingSession = _editingSession.copyWith(
+                            poopAmount: amount,
+                            poopConsistency: amount == PoopAmount.na ? PoopConsistency.normal : null,
+                            poopColor: amount == PoopAmount.na ? PoopColor.yellow : null,
+                            poopTime: amount == PoopAmount.na ? null : _editingSession.poopTime,
+                          );
+                          _markAsChanged();
+                        });
+                      }
+                    },
+                  );
+                }).toList(),
+              ),
             ),
-            SizedBox(height: 8),
-            Text('Consistency'),
-            Wrap(
-              spacing: 8.0,
-              children: PoopConsistency.values.map((consistency) {
-                return ChoiceChip(
-                  label: Text(consistency.name),
-                  selected: _editingSession.poopConsistency == consistency,
-                  onSelected: (selected) {
-                    if (selected) {
-                      setState(() {
-                        _editingSession = _editingSession.copyWith(poopConsistency: consistency);
-                        _markAsChanged();
-                      });
-                    }
-                  },
-                );
-              }).toList(),
-            ),
-            Text('Color'),
-            SizedBox(height: 8),
-            Wrap(
-              spacing: 8.0,
-              children: PoopColor.values.map((color) {
-                return ChoiceChip(
-                  label: Text(color.name),
-                  selected: _editingSession.poopColor == color,
-                  onSelected: (selected) {
-                    if (selected) {
-                      setState(() {
-                        _editingSession = _editingSession.copyWith(poopColor: color);
-                        _markAsChanged();
-                      });
-                    }
-                  },
-                );
-              }).toList(),
-            ),
-            if (_editingSession.poopColor == PoopColor.abnormal) ...[
+            if (_editingSession.poopAmount != PoopAmount.na) ...[
               SizedBox(height: 8),
-              if (!_editingSession.hasAbnormalPoopPhoto)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: () async {
-                        final ImagePicker picker = ImagePicker();
-                        final XFile? image = await picker.pickImage(
-                          source: ImageSource.camera,
-                        );
-                        if (image != null) {
-                          final provider = Provider.of<SessionProvider>(context, listen: false);
-                          final String? photoPath = await provider.savePhotoOnly(image, 'poop');
-                          if (photoPath != null) {
-                            setState(() {
-                              _editingSession = _editingSession.copyWith(
-                                abnormalPoopPhotoPath: photoPath,
-                                hasAbnormalPoopPhoto: true,
-                              );
-                              _markAsChanged();
-                            });
-                          }
+              Consumer<SessionProvider>(
+                builder: (context, provider, child) => TimePickerRow(
+                  time: _editingSession.poopTime,
+                  placeholder: 'Time not set',
+                  icon: Icons.access_time,
+                  firstDate: _editingSession.wakeUpTime,
+                  lastDate: _editingSession.sleepTime ?? DateTime.now(),
+                  onValidate: (time) => isValidActivityTime(context, time, _editingSession, provider),
+                  onTimeSelected: (time) {
+                    setState(() {
+                      _editingSession = _editingSession.copyWith(poopTime: time);
+                      _markAsChanged();
+                    });
+                  },
+                ),
+              ),
+              SizedBox(height: 8),
+              Text('Consistency'),
+              Container(
+                width: double.infinity,
+                child: Wrap(
+                  spacing: 8.0,
+                  children: PoopConsistency.values.map((consistency) {
+                    return ChoiceChip(
+                      label: Text(consistency.name),
+                      selected: _editingSession.poopConsistency == consistency,
+                      onSelected: (selected) {
+                        if (selected) {
+                          setState(() {
+                            _editingSession = _editingSession.copyWith(poopConsistency: consistency);
+                            _markAsChanged();
+                          });
                         }
                       },
-                      icon: Icon(Icons.camera_alt),
-                      label: Text('Camera'),
-                    ),
-                    ElevatedButton.icon(
-                      onPressed: () async {
-                        final ImagePicker picker = ImagePicker();
-                        final XFile? image = await picker.pickImage(
-                          source: ImageSource.gallery,
-                        );
-                        if (image != null) {
-                          final provider = Provider.of<SessionProvider>(context, listen: false);
-                          final String? photoPath = await provider.savePhotoOnly(image, 'poop');
-                          if (photoPath != null) {
-                            setState(() {
-                              _editingSession = _editingSession.copyWith(
-                                abnormalPoopPhotoPath: photoPath,
-                                hasAbnormalPoopPhoto: true,
-                              );
-                              _markAsChanged();
-                            });
-                          }
+                    );
+                  }).toList(),
+                ),
+              ),
+              Text('Color'),
+              SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                child: Wrap(
+                  spacing: 8.0,
+                  children: PoopColor.values.map((color) {
+                    return ChoiceChip(
+                      label: Text(color.name),
+                      selected: _editingSession.poopColor == color,
+                      onSelected: (selected) {
+                        if (selected) {
+                          setState(() {
+                            _editingSession = _editingSession.copyWith(poopColor: color);
+                            _markAsChanged();
+                          });
                         }
                       },
-                      icon: Icon(Icons.photo_library),
-                      label: Text('Gallery'),
-                    ),
-                  ],
-                )
-              else
-                _buildAbnormalPoopPhotoSection(context),
+                    );
+                  }).toList(),
+                ),
+              ),
+              if (_editingSession.poopColor == PoopColor.abnormal) ...[
+                SizedBox(height: 8),
+                if (!_editingSession.hasAbnormalPoopPhoto)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          final ImagePicker picker = ImagePicker();
+                          final XFile? image = await picker.pickImage(
+                            source: ImageSource.camera,
+                          );
+                          if (image != null) {
+                            final provider = Provider.of<SessionProvider>(context, listen: false);
+                            final String? photoPath = await provider.savePhotoOnly(image, 'poop');
+                            if (photoPath != null) {
+                              setState(() {
+                                _editingSession = _editingSession.copyWith(
+                                  abnormalPoopPhotoPath: photoPath,
+                                  hasAbnormalPoopPhoto: true,
+                                );
+                                _markAsChanged();
+                              });
+                            }
+                          }
+                        },
+                        icon: Icon(Icons.camera_alt),
+                        label: Text('Camera'),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          final ImagePicker picker = ImagePicker();
+                          final XFile? image = await picker.pickImage(
+                            source: ImageSource.gallery,
+                          );
+                          if (image != null) {
+                            final provider = Provider.of<SessionProvider>(context, listen: false);
+                            final String? photoPath = await provider.savePhotoOnly(image, 'poop');
+                            if (photoPath != null) {
+                              setState(() {
+                                _editingSession = _editingSession.copyWith(
+                                  abnormalPoopPhotoPath: photoPath,
+                                  hasAbnormalPoopPhoto: true,
+                                );
+                                _markAsChanged();
+                              });
+                            }
+                          }
+                        },
+                        icon: Icon(Icons.photo_library),
+                        label: Text('Gallery'),
+                      ),
+                    ],
+                  )
+                else
+                  _buildAbnormalPoopPhotoSection(context),
+              ],
             ],
           ],
         ),
@@ -545,6 +500,23 @@ class _EditSessionScreenState extends State<EditSessionScreen> {
             Text(
               'Milk Intake (ml)',
               style: Theme.of(context).textTheme.titleLarge,
+            ),
+            SizedBox(height: 8),
+            Consumer<SessionProvider>(
+              builder: (context, provider, child) => TimePickerRow(
+                time: _editingSession.milkTime,
+                placeholder: 'Time not set',
+                icon: Icons.access_time,
+                firstDate: _editingSession.wakeUpTime,
+                lastDate: _editingSession.sleepTime ?? DateTime.now(),
+                onValidate: (time) => isValidActivityTime(context, time, _editingSession, provider),
+                onTimeSelected: (time) {
+                  setState(() {
+                    _editingSession = _editingSession.copyWith(milkTime: time);
+                    _markAsChanged();
+                  });
+                },
+              ),
             ),
             SizedBox(height: 8),
             TextField(
@@ -728,83 +700,26 @@ class _EditSessionScreenState extends State<EditSessionScreen> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.bedtime),
-                SizedBox(width: 8),
-                Text(
-                  _editingSession.sleepTime != null
-                      ? DateFormat('MMM dd, yyyy HH:mm').format(_editingSession.sleepTime!)
-                      : 'Not set',
-                ),
-                Spacer(),
-                TextButton(
-                  onPressed: () async {
-                    final provider = Provider.of<SessionProvider>(context, listen: false);
-                    final now = DateTime.now();
-                    final truncatedTime = DateTime(
-                      now.year, now.month, now.day, now.hour, now.minute
-                    );
-                    if (_isValidSleepTime(truncatedTime, provider)) {
-                      setState(() {
-                        _editingSession = _editingSession.copyWith(sleepTime: truncatedTime);
-                        _markAsChanged();
-                      });
-                    }
+            Consumer<SessionProvider>(
+              builder: (context, provider, child) {
+                final nextSession = provider.getNextSession(_editingSession);
+                final lastDate = nextSession?.wakeUpTime ?? DateTime.now();
+
+                return TimePickerRow(
+                  time: _editingSession.sleepTime,
+                  placeholder: 'Not set',
+                  icon: Icons.bedtime,
+                  firstDate: _editingSession.wakeUpTime,
+                  lastDate: lastDate,
+                  onValidate: (time) => isValidSleepTime(context, time, _editingSession, provider),
+                  onTimeSelected: (time) {
+                    setState(() {
+                      _editingSession = _editingSession.copyWith(sleepTime: time);
+                      _markAsChanged();
+                    });
                   },
-                  child: Text('Now'),
-                ),
-                SizedBox(width: 8),
-                TextButton(
-                  onPressed: () async {
-                    final provider = Provider.of<SessionProvider>(context, listen: false);
-                    final nextSession = provider.getNextSession(_editingSession);
-                    
-                    // Sleep time must be after wake up time
-                    final firstDate = _editingSession.wakeUpTime;
-                    
-                    // Sleep time must be before next session's wake up time or now
-                    final lastDate = nextSession?.wakeUpTime ?? DateTime.now();
-                    
-                    final DateTime? picked = await showDatePicker(
-                      context: context,
-                      initialDate: _editingSession.sleepTime ?? DateTime.now(),
-                      firstDate: firstDate,
-                      lastDate: lastDate,
-                    );
-                    if (picked != null) {
-                      final TimeOfDay? time = await showTimePicker(
-                        context: context,
-                        initialTime: TimeOfDay.fromDateTime(
-                          _editingSession.sleepTime ?? DateTime.now(),
-                        ),
-                      );
-                      if (time != null) {
-                        final newDateTime = DateTime(
-                          picked.year,
-                          picked.month,
-                          picked.day,
-                          time.hour,
-                          time.minute,
-                        );
-                        
-                        if (_isValidSleepTime(newDateTime, provider)) {
-                          setState(() {
-                            _editingSession = _editingSession.copyWith(sleepTime: newDateTime);
-                            _markAsChanged();
-                          });
-                        } else {
-                          _showTimeValidationError(
-                            'Invalid sleep time. Must be after wake up time'
-                            ' and before the next session\'s wake up time.'
-                          );
-                        }
-                      }
-                    }
-                  },
-                  child: Text(_editingSession.sleepTime == null ? 'Set' : 'Change'),
-                ),
-              ],
+                );
+              },
             ),
           ],
         ),
