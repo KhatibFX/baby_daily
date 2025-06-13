@@ -1,4 +1,6 @@
-import 'package:flutter/foundation.dart';
+import 'pee_entry.dart';
+import 'poop_entry.dart';
+import 'milk_entry.dart';
 
 enum PeeAmount { na, small, medium, large, xlarge }
 enum PoopAmount { na, small, medium, large, blowout }
@@ -8,59 +10,61 @@ enum PoopColor { green, yellow, yellowGreen, abnormal }
 class Session {
   final int? id;
   DateTime wakeUpTime;
-  PeeAmount pee;
-  String? peeRemarks;
-  DateTime? peeTime;  // New field
-  PoopAmount poopAmount;
-  PoopConsistency poopConsistency;
-  PoopColor poopColor;
-  DateTime? poopTime;  // New field
-  String? abnormalPoopPhotoPath;
-  bool hasAbnormalPoopPhoto;
-  int milkIntake;
-  DateTime? milkTime;  // New field
+  List<PeeEntry> peeEntries;
+  List<PoopEntry> poopEntries;
+  List<MilkEntry> milkEntries;
   bool vitaminAD;
   DateTime? sleepTime;
   String? sessionPhotoPath;
   bool hasSessionPhoto;
   bool isClosed;
 
+  int get totalMilkIntake => milkEntries.fold(0, (sum, entry) => sum + entry.amount);
+
   Session({
     this.id,
     required this.wakeUpTime,
-    this.pee = PeeAmount.na,
-    this.peeRemarks,
-    this.peeTime,  // New field
-    this.poopAmount = PoopAmount.na,
-    this.poopConsistency = PoopConsistency.normal,
-    this.poopColor = PoopColor.yellow,
-    this.poopTime,  // New field
-    this.abnormalPoopPhotoPath,
-    this.hasAbnormalPoopPhoto = false,
-    this.milkIntake = 0,
-    this.milkTime,  // New field
+    List<PeeEntry>? peeEntries,
+    List<PoopEntry>? poopEntries,
+    List<MilkEntry>? milkEntries,
     this.vitaminAD = false,
     this.sleepTime,
     this.sessionPhotoPath,
     this.hasSessionPhoto = false,
     this.isClosed = false,
-  });
+  })  : peeEntries = peeEntries ?? [],
+        poopEntries = poopEntries ?? [],
+        milkEntries = milkEntries ?? [];
+
+  // Helper methods to manage entries
+  void addPeeEntry(PeeEntry entry) {
+    peeEntries.insert(0, entry); // Add to the beginning to maintain time order
+  }
+
+  void addPoopEntry(PoopEntry entry) {
+    poopEntries.insert(0, entry);
+  }
+
+  void addMilkEntry(MilkEntry entry) {
+    milkEntries.add(entry);  // Add to the end to maintain time order (ascending)
+  }
+
+  void removePeeEntry(int entryId) {
+    peeEntries.removeWhere((entry) => entry.id == entryId);
+  }
+
+  void removePoopEntry(int entryId) {
+    poopEntries.removeWhere((entry) => entry.id == entryId);
+  }
+
+  void removeMilkEntry(int entryId) {
+    milkEntries.removeWhere((entry) => entry.id == entryId);
+  }
 
   Map<String, dynamic> toMap() {
     return {
       'id': id,
       'wakeUpTime': wakeUpTime.toIso8601String(),
-      'pee': pee.index,
-      'peeRemarks': peeRemarks,
-      'peeTime': peeTime?.toIso8601String(),  // New field
-      'poopAmount': poopAmount.index,
-      'poopConsistency': poopConsistency.index,
-      'poopColor': poopColor.index,
-      'poopTime': poopTime?.toIso8601String(),  // New field
-      'abnormalPoopPhotoPath': abnormalPoopPhotoPath,
-      'hasAbnormalPoopPhoto': hasAbnormalPoopPhoto ? 1 : 0,
-      'milkIntake': milkIntake,
-      'milkTime': milkTime?.toIso8601String(),  // New field
       'vitaminAD': vitaminAD ? 1 : 0,
       'sleepTime': sleepTime?.toIso8601String(),
       'sessionPhotoPath': sessionPhotoPath,
@@ -73,17 +77,6 @@ class Session {
     return Session(
       id: map['id'] as int?,
       wakeUpTime: DateTime.parse(map['wakeUpTime']),
-      pee: PeeAmount.values[map['pee']],
-      peeRemarks: map['peeRemarks'],
-      peeTime: map['peeTime'] != null ? DateTime.parse(map['peeTime']) : null,  // New field
-      poopAmount: PoopAmount.values[map['poopAmount']],
-      poopConsistency: PoopConsistency.values[map['poopConsistency']],
-      poopColor: PoopColor.values[map['poopColor']],
-      poopTime: map['poopTime'] != null ? DateTime.parse(map['poopTime']) : null,  // New field
-      abnormalPoopPhotoPath: map['abnormalPoopPhotoPath'],
-      hasAbnormalPoopPhoto: map['hasAbnormalPoopPhoto'] == 1,
-      milkIntake: map['milkIntake'],
-      milkTime: map['milkTime'] != null ? DateTime.parse(map['milkTime']) : null,  // New field
       vitaminAD: map['vitaminAD'] == 1,
       sleepTime: map['sleepTime'] != null 
           ? DateTime.parse(map['sleepTime'])
@@ -97,17 +90,9 @@ class Session {
   Session copyWith({
     int? id,
     DateTime? wakeUpTime,
-    PeeAmount? pee,
-    String? peeRemarks,
-    DateTime? peeTime,  // New field
-    PoopAmount? poopAmount,
-    PoopConsistency? poopConsistency,
-    PoopColor? poopColor,
-    DateTime? poopTime,  // New field
-    String? abnormalPoopPhotoPath,
-    bool? hasAbnormalPoopPhoto,
-    int? milkIntake,
-    DateTime? milkTime,  // New field
+    List<PeeEntry>? peeEntries,
+    List<PoopEntry>? poopEntries,
+    List<MilkEntry>? milkEntries,
     bool? vitaminAD,
     DateTime? sleepTime,
     String? sessionPhotoPath,
@@ -117,17 +102,9 @@ class Session {
     return Session(
       id: id ?? this.id,
       wakeUpTime: wakeUpTime ?? this.wakeUpTime,
-      pee: pee ?? this.pee,
-      peeRemarks: peeRemarks ?? this.peeRemarks,
-      peeTime: peeTime ?? this.peeTime,  // New field
-      poopAmount: poopAmount ?? this.poopAmount,
-      poopConsistency: poopConsistency ?? this.poopConsistency,
-      poopColor: poopColor ?? this.poopColor,
-      poopTime: poopTime ?? this.poopTime,  // New field
-      abnormalPoopPhotoPath: abnormalPoopPhotoPath ?? this.abnormalPoopPhotoPath,
-      hasAbnormalPoopPhoto: hasAbnormalPoopPhoto ?? this.hasAbnormalPoopPhoto,
-      milkIntake: milkIntake ?? this.milkIntake,
-      milkTime: milkTime ?? this.milkTime,  // New field
+      peeEntries: peeEntries ?? List.from(this.peeEntries),
+      poopEntries: poopEntries ?? List.from(this.poopEntries),
+      milkEntries: milkEntries ?? List.from(this.milkEntries),
       vitaminAD: vitaminAD ?? this.vitaminAD,
       sleepTime: sleepTime ?? this.sleepTime,
       sessionPhotoPath: sessionPhotoPath ?? this.sessionPhotoPath,

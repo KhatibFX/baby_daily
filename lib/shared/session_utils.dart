@@ -32,19 +32,25 @@ Future<bool> isValidWakeUpTime(
   }
 
   // Rule 2: Can't be after any activity time in the current session
-  if (session.peeTime != null && time.isAfter(session.peeTime!)) {
-    showTimeValidationError(context, 'Wake-up time cannot be after the session\'s pee time');
-    return false;
+  for (final pee in session.peeEntries) {
+    if (time.isAfter(pee.time)) {
+      showTimeValidationError(context, 'Wake-up time cannot be after any pee time');
+      return false;
+    }
   }
 
-  if (session.poopTime != null && time.isAfter(session.poopTime!)) {
-    showTimeValidationError(context, 'Wake-up time cannot be after the session\'s poop time');
-    return false;
+  for (final poop in session.poopEntries) {
+    if (time.isAfter(poop.time)) {
+      showTimeValidationError(context, 'Wake-up time cannot be after any poop time');
+      return false;
+    }
   }
 
-  if (session.milkTime != null && time.isAfter(session.milkTime!)) {
-    showTimeValidationError(context, 'Wake-up time cannot be after the session\'s milk time');
-    return false;
+  for (final milk in session.milkEntries) {
+    if (time.isAfter(milk.time)) {
+      showTimeValidationError(context, 'Wake-up time cannot be after any milk time');
+      return false;
+    }
   }
 
   // Rule 3: Can't be after current session's sleep time (if set)
@@ -75,19 +81,25 @@ Future<bool> isValidSleepTime(
   }
 
   // Rule 2: Can't be before any activity time
-  if (session.peeTime != null && time.isBefore(session.peeTime!)) {
-    showTimeValidationError(context, 'Sleep time cannot be before the session\'s pee time');
-    return false;
+  for (final pee in session.peeEntries) {
+    if (time.isBefore(pee.time)) {
+      showTimeValidationError(context, 'Sleep time cannot be before any pee time');
+      return false;
+    }
   }
 
-  if (session.poopTime != null && time.isBefore(session.poopTime!)) {
-    showTimeValidationError(context, 'Sleep time cannot be before the session\'s poop time');
-    return false;
+  for (final poop in session.poopEntries) {
+    if (time.isBefore(poop.time)) {
+      showTimeValidationError(context, 'Sleep time cannot be before any poop time');
+      return false;
+    }
   }
 
-  if (session.milkTime != null && time.isBefore(session.milkTime!)) {
-    showTimeValidationError(context, 'Sleep time cannot be before the session\'s milk time');
-    return false;
+  for (final milk in session.milkEntries) {
+    if (time.isBefore(milk.time)) {
+      showTimeValidationError(context, 'Sleep time cannot be before any milk time');
+      return false;
+    }
   }
 
   // Rule 3: Can't be after next session's wake-up time or now

@@ -11,29 +11,7 @@ import '../shared/widgets/vitamin_section_card.dart';
 import '../shared/widgets/session_photo_card.dart';
 import '../shared/widgets/time_section_cards.dart';
 
-class SessionScreen extends StatefulWidget {
-  @override
-  _SessionScreenState createState() => _SessionScreenState();
-}
-
-class _SessionScreenState extends State<SessionScreen> {
-  late TextEditingController _peeRemarksController;
-  late TextEditingController _milkIntakeController;
-
-  @override
-  void initState() {
-    super.initState();
-    _peeRemarksController = TextEditingController();
-    _milkIntakeController = TextEditingController();
-  }
-
-  @override
-  void dispose() {
-    _peeRemarksController.dispose();
-    _milkIntakeController.dispose();
-    super.dispose();
-  }
-
+class SessionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Consumer<SessionProvider>(
@@ -48,16 +26,6 @@ class _SessionScreenState extends State<SessionScreen> {
             ),
           );
         }
-
-        // Update controllers when session changes
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_peeRemarksController.text != session.peeRemarks) {
-            _peeRemarksController.text = session.peeRemarks ?? '';
-          }
-          if (_milkIntakeController.text != session.milkIntake.toString()) {
-            _milkIntakeController.text = session.milkIntake.toString();
-          }
-        });
 
         return GestureDetector(
           onTap: () {
@@ -128,7 +96,6 @@ class _SessionScreenState extends State<SessionScreen> {
       onSessionChanged: (updatedSession) async {
         await provider.updateCurrentSession(updatedSession);
       },
-      remarksController: _peeRemarksController,
     );
   }
 
@@ -155,7 +122,6 @@ class _SessionScreenState extends State<SessionScreen> {
       onSessionChanged: (updatedSession) async {
         await provider.updateCurrentSession(updatedSession);
       },
-      intakeController: _milkIntakeController,
     );
   }
 

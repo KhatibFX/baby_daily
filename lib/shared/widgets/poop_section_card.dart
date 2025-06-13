@@ -5,9 +5,11 @@ import 'package:provider/provider.dart';
 import 'package:path/path.dart' as path;
 
 import '../../models/session.dart';
+import '../../models/poop_entry.dart';
 import '../../providers/session_provider.dart';
 import '../session_utils.dart';
 import '../session_widgets.dart';
+import '../shared.dart';
 
 class PoopSectionCard extends StatelessWidget {
   final Session session;
@@ -29,208 +31,256 @@ class PoopSectionCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Poop',
-              style: Theme.of(context).textTheme.titleLarge,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Poop',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                IconButton(
+                  icon: Icon(Icons.add),
+                  onPressed: () => _addNewPoopEntry(context),
+                ),
+              ],
             ),
             SizedBox(height: 8),
-            Text('Amount'),
-            Container(
-              width: double.infinity,
-              child: Wrap(
-                spacing: 8.0,
-                children: PoopAmount.values.map((amount) {
-                  return ChoiceChip(
-                    label: Text(amount.name),
-                    selected: session.poopAmount == amount,
-                    onSelected: (selected) {
-                      if (selected) {
-                        // When amount is set to na, reset other poop-related fields
-                        final updatedSession = session.copyWith(
-                          poopAmount: amount,
-                          poopConsistency:
-                              amount == PoopAmount.na ? PoopConsistency.normal : null,
-                          poopColor: amount == PoopAmount.na ? PoopColor.yellow : null,
-                          poopTime: amount == PoopAmount.na ? null : session.poopTime,
-                        );
-                        onSessionChanged(updatedSession);
+            if (session.poopEntries.isEmpty)
+              Center(
+                child: Text('No poop entries recorded'),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: NeverScrollableScrollPhysics(),
+                itemCount: session.poopEntries.length,
+                separatorBuilder: (context, index) => Divider(),
+                itemBuilder: (context, index) {
+                  final entry = session.poopEntries[index];
+                  return _PoopEntryItem(
+                    entry: entry,
+                    session: session,
+                    isEditing: isEditing,
+                    onUpdate: (updatedEntry) async {
+                      final updatedEntries = List.of(session.poopEntries);
+                      updatedEntries[index] = updatedEntry;
+                      onSessionChanged(session.copyWith(poopEntries: updatedEntries));
+
+                      // The database update will happen when the user saves the session
+                      if (session.isClosed) {
+                        final provider = context.read<SessionProvider>();
+                        await provider.updateSession(session.copyWith(poopEntries: updatedEntries));
                       }
                     },
+                    onDelete: entry.id != null ? () async {
+                      final provider = context.read<SessionProvider>();
+                      final success = await provider.deletePoopEntry(entry.id!, session.id!, photoPath: entry.photoPath);
+                      if (success) {
+                        final updatedEntries = List.of(session.poopEntries)..removeAt(index);
+                        onSessionChanged(session.copyWith(poopEntries: updatedEntries));
+                      }
+                    } : null,
                   );
-                }).toList(),
+                },
               ),
-            ),
-            if (session.poopAmount != PoopAmount.na) ...[
-              SizedBox(height: 8),
-              Consumer<SessionProvider>(
-                builder: (context, provider, child) => TimePickerRow(
-                  time: session.poopTime,
-                  placeholder: 'Time not set',
-                  icon: Icons.access_time,
-                  firstDate: session.wakeUpTime,
-                  lastDate: session.sleepTime ?? DateTime.now(),
-                  onValidate: (time) => isValidActivityTime(context, time, session, provider),
-                  onTimeSelected: (time) {
-                    final updatedSession = session.copyWith(poopTime: time);
-                    onSessionChanged(updatedSession);
-                  },
-                ),
-              ),
-              Text('Consistency'),
-              SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                child: Wrap(
-                  spacing: 8.0,
-                  children: PoopConsistency.values.map((consistency) {
-                    return ChoiceChip(
-                      label: Text(consistency.name),
-                      selected: session.poopConsistency == consistency,
-                      onSelected: (selected) {
-                        if (selected) {
-                          final updatedSession = session.copyWith(poopConsistency: consistency);
-                          onSessionChanged(updatedSession);
-                        }
-                      },
-                    );
-                  }).toList(),
-                ),
-              ),
-              Text('Color'),
-              SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                child: Wrap(
-                  spacing: 8.0,
-                  children: PoopColor.values.map((color) {
-                    return ChoiceChip(
-                      label: Text(color.name),
-                      selected: session.poopColor == color,
-                      onSelected: (selected) {
-                        if (selected) {
-                          final updatedSession = session.copyWith(poopColor: color);
-                          onSessionChanged(updatedSession);
-                        }
-                      },
-                    );
-                  }).toList(),
-                ),
-              ),
-              if (session.poopColor == PoopColor.abnormal) ...[
-                SizedBox(height: 8),
-                if (!session.hasAbnormalPoopPhoto)
-                  _buildPhotoButtons(context)
-                else
-                  _buildPoopPhotoDisplay(context),
-              ],
-            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPhotoButtons(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+  Future<void> _addNewPoopEntry(BuildContext context) async {
+    if (session.id == null) return;
+    
+    final provider = context.read<SessionProvider>();
+    final savedEntry = await provider.addPoopEntry(
+      sessionId: session.id!,
+      amount: PoopAmount.na,
+      time: truncateToMinute(DateTime.now()),
+      consistency: PoopConsistency.normal,
+      color: PoopColor.yellow,
+    );
+    
+    final updatedEntries = List.of(session.poopEntries)..add(savedEntry);
+    onSessionChanged(session.copyWith(poopEntries: updatedEntries));
+  }
+}
+
+class _PoopEntryItem extends StatelessWidget {
+  final PoopEntry entry;
+  final Session session;
+  final bool isEditing;
+  final Function(PoopEntry) onUpdate;
+  final VoidCallback? onDelete;
+
+  const _PoopEntryItem({
+    Key? key,
+    required this.entry,
+    required this.session,
+    required this.isEditing,
+    required this.onUpdate,
+    this.onDelete,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final sessionProvider = context.read<SessionProvider>();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ElevatedButton.icon(
-          onPressed: () => _handlePhotoCapture(context, ImageSource.camera),
-          icon: Icon(Icons.camera_alt),
-          label: Text('Camera'),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Amount'),
+                  Wrap(
+                    spacing: 8.0,
+                    children: PoopAmount.values.map((amount) {
+                      return ChoiceChip(
+                        label: Text(amount.name),
+                        selected: entry.amount == amount,
+                        onSelected: (selected) {
+                          if (selected) {
+                            onUpdate(entry.copyWith(
+                              amount: amount,
+                              consistency: amount == PoopAmount.na ? PoopConsistency.normal : entry.consistency,
+                              color: amount == PoopAmount.na ? PoopColor.yellow : entry.color,
+                            ));
+                          }
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+            if (onDelete != null)
+              IconButton(
+                icon: Icon(Icons.delete),
+                onPressed: onDelete,
+              ),
+          ],
         ),
-        ElevatedButton.icon(
-          onPressed: () => _handlePhotoCapture(context, ImageSource.gallery),
-          icon: Icon(Icons.photo_library),
-          label: Text('Gallery'),
-        ),
+        if (entry.amount != PoopAmount.na) ...[
+          SizedBox(height: 8),
+          TimePickerRow(
+            time: entry.time,
+            placeholder: 'Time not set',
+            icon: Icons.access_time,
+            firstDate: session.wakeUpTime,
+            lastDate: session.sleepTime ?? DateTime.now(),
+            onValidate: (time) => isValidActivityTime(context, time, session, sessionProvider),
+            onTimeSelected: (time) {
+              onUpdate(entry.copyWith(time: time));
+            },
+          ),
+          Text('Consistency'),
+          SizedBox(height: 8),
+          Wrap(
+            spacing: 8.0,
+            children: PoopConsistency.values.map((consistency) {
+              return ChoiceChip(
+                label: Text(consistency.name),
+                selected: entry.consistency == consistency,
+                onSelected: (selected) {
+                  if (selected) {
+                    onUpdate(entry.copyWith(consistency: consistency));
+                  }
+                },
+              );
+            }).toList(),
+          ),
+          Text('Color'),
+          SizedBox(height: 8),
+          Wrap(
+            spacing: 8.0,
+            children: PoopColor.values.map((color) {
+              return ChoiceChip(
+                label: Text(color.name),
+                selected: entry.color == color,
+                onSelected: (selected) {
+                  if (selected) {
+                    onUpdate(entry.copyWith(color: color));
+                  }
+                },
+              );
+            }).toList(),
+          ),
+          if (entry.color == PoopColor.abnormal) ...[
+            SizedBox(height: 16),
+            _buildPhotoSection(context, sessionProvider),
+          ],
+        ],
       ],
     );
   }
 
-  Future<void> _handlePhotoCapture(BuildContext context, ImageSource source) async {
+  Widget _buildPhotoSection(BuildContext context, SessionProvider sessionProvider) {
+    if (!isEditing && !entry.hasPhoto) {
+      return Container();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Abnormal Poop Photo'),
+        SizedBox(height: 8),
+        if (entry.hasPhoto && entry.photoPath != null) ...[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8.0),
+            child: Image.file(
+              File(entry.photoPath!),
+              height: 200,
+              width: double.infinity,
+              fit: BoxFit.cover,
+            ),
+          ),
+          if (isEditing) ...[
+            SizedBox(height: 8),
+            ElevatedButton.icon(
+              onPressed: () => _deletePhoto(context, sessionProvider),
+              icon: Icon(Icons.delete),
+              label: Text('Delete Photo'),
+            ),
+          ],
+        ] else if (isEditing) ...[
+          ElevatedButton.icon(
+            onPressed: () => _takePhoto(context, sessionProvider),
+            icon: Icon(Icons.camera_alt),
+            label: Text('Take Photo'),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _takePhoto(BuildContext context, SessionProvider sessionProvider) async {
     final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: source);
+    final XFile? image = await picker.pickImage(source: ImageSource.camera);
+
     if (image != null) {
-      final provider = Provider.of<SessionProvider>(context, listen: false);
-      if (isEditing) {
-        final String? photoPath = await provider.savePhotoOnly(image, 'poop');
-        if (photoPath != null) {
-          final updatedSession = session.copyWith(
-            abnormalPoopPhotoPath: photoPath,
-            hasAbnormalPoopPhoto: true,
-          );
-          onSessionChanged(updatedSession);
-        }
-      } else {
-        await provider.saveAbnormalPoopPhoto(session, image);
-      }
+      final String photoFileName = 'poop_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final String photoPath = path.join(path.dirname(image.path), photoFileName);
+      
+      // Move the temporary file to a permanent location
+      await File(image.path).copy(photoPath);
+      await File(image.path).delete();
+      
+      onUpdate(entry.copyWith(photoPath: photoPath, hasPhoto: true));
     }
   }
 
-  Widget _buildPoopPhotoDisplay(BuildContext context) {
-    if (!session.hasAbnormalPoopPhoto || session.abnormalPoopPhotoPath == null) {
-      return const SizedBox.shrink();
+  Future<void> _deletePhoto(BuildContext context, SessionProvider sessionProvider) async {
+    if (entry.photoPath != null) {
+      final file = File(entry.photoPath!);
+      if (await file.exists()) {
+        await file.delete();
+      }
+      onUpdate(entry.copyWith(photoPath: null, hasPhoto: false));
     }
-
-    return Consumer<SessionProvider>(
-      builder: (context, provider, child) => FutureBuilder<String>(
-        future: provider.photoDirectory,
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final fullPath = path.join(
-            snapshot.data!,
-            session.abnormalPoopPhotoPath!,
-          );
-
-          return Column(
-            children: [
-              Image.file(
-                File(fullPath),
-                height: 200,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 200,
-                    width: double.infinity,
-                    color: Colors.grey[300],
-                    child: Center(child: Text('Failed to load image')),
-                  );
-                },
-              ),
-              SizedBox(height: 8),
-              ElevatedButton.icon(
-                onPressed: () async {
-                  if (isEditing) {
-                    final provider = Provider.of<SessionProvider>(context, listen: false);                          
-                    if (session.abnormalPoopPhotoPath != null) {
-                      await provider.deletePhotoOnly(session.abnormalPoopPhotoPath!);
-                    }
-                    final updatedSession = session.copyWith(
-                      abnormalPoopPhotoPath: null,
-                      hasAbnormalPoopPhoto: false,
-                    );
-                    onSessionChanged(updatedSession);
-                  } else {
-                    final provider = Provider.of<SessionProvider>(context, listen: false);
-                    await provider.removeAbnormalPoopPhoto(session);
-                  }
-                },
-                icon: Icon(Icons.delete),
-                label: Text('Remove Photo'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
   }
 }

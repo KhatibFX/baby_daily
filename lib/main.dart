@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'providers/session_provider.dart';
+import 'providers/edit_session_provider.dart';
 import 'screens/session_screen.dart';
 import 'screens/session_history_screen.dart';
 import 'screens/analytics_screen.dart';
@@ -15,13 +16,20 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider<SessionProvider>(
-      create: (_) {
-        final provider = SessionProvider();
-        // Load sessions immediately when the app starts
-        provider.loadSessions();
-        return provider;
-      },
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<SessionProvider>(
+          create: (_) {
+            final provider = SessionProvider();
+            // Load sessions immediately when the app starts
+            provider.loadSessions();
+            return provider;
+          },
+        ),
+        ChangeNotifierProvider<EditSessionProvider>(
+          create: (_) => EditSessionProvider(),
+        ),
+      ],
       child: MaterialApp(
         title: 'Baby Daily',
         theme: ThemeData(

@@ -7,6 +7,9 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
 import '../models/session.dart';
+import '../models/pee_entry.dart';
+import '../models/poop_entry.dart';
+import '../models/milk_entry.dart';
 import '../services/database_service.dart';
 
 class SessionProvider with ChangeNotifier {
@@ -57,14 +60,20 @@ class SessionProvider with ChangeNotifier {
     final photosDir = await _photoDirectory;
     // If already absolute path containing photosDir, return as is
     if (path.isAbsolute(relativePath) && relativePath.startsWith(photosDir)) {
-      print('Using existing absolute path: $relativePath');
       return relativePath;
     }
     // Remove any leading slashes from relative path
     final cleanPath = relativePath.replaceAll(RegExp(r'^[/\\]+'), '');
-    final absolutePath = path.join(photosDir, cleanPath);
-    print('Constructed absolute path: $absolutePath from relative path: $relativePath');
-    return absolutePath;
+    return path.join(photosDir, cleanPath);
+  }
+
+  Future<void> _deletePhotoFile(String photoPath) async {
+    final absolutePath = await _getAbsolutePath(photoPath);
+    final file = File(absolutePath);
+    if (await file.exists()) {
+      await file.delete();
+      print('Successfully deleted photo: $photoPath');
+    }
   }
 
   Future<void> loadSessions() async {
@@ -92,9 +101,30 @@ class SessionProvider with ChangeNotifier {
     await loadSessions();
   }
 
+  Future<void> deleteSession(Session session) async {
+    // Delete all photos associated with poop entries
+    for (final entry in session.poopEntries) {
+      if (entry.hasPhoto && entry.photoPath != null) {
+        await _deletePhotoFile(entry.photoPath!);
+      }
+    }
+    
+    // Delete the session photo if it exists
+    if (session.hasSessionPhoto && session.sessionPhotoPath != null) {
+      await _deletePhotoFile(session.sessionPhotoPath!);
+    }
+    
+    await _db.deleteSession(session.id!);
+
+    // Reload sessions
+    await loadSessions();
+  }
+
   Future<void> updateCurrentSession(Session updatedSession) async {
     if (_currentSession?.id == null) return;
-    await _updateSession(updatedSession);
+    await _db.updateSession(updatedSession);
+    _currentSession = updatedSession;
+    notifyListeners();
   }
 
   Future<void> updateDefaultSleepTime() async {
@@ -107,20 +137,19 @@ class SessionProvider with ChangeNotifier {
     }
   }
 
-  Future<void> closeCurrentSession() async {
-    if (_currentSession == null) return;
-
-    // Sleep time must be set before closing
-    if (_currentSession?.sleepTime == null) {
-      return;
-    }
-
-    final closedSession = _currentSession!.copyWith(
-      isClosed: true,
-    );
-    await _db.updateSession(closedSession);
+  Future<void> closeSession(Session session, DateTime sleepTime) async {
+    final updatedSession = session.copyWith(sleepTime: sleepTime, isClosed: true);
+    await _db.updateSession(updatedSession);
+    _lastSleepTime = sleepTime;
     _currentSession = null;
     await loadSessions();
+  }
+
+  Future<void> closeCurrentSession() async {
+    if (_currentSession == null || _currentSession!.isClosed) return;
+    if (_currentSession!.sleepTime == null) return;
+
+    await closeSession(_currentSession!, _currentSession!.sleepTime!);
   }
 
   Future<List<Session>> getSessionsInRange(DateTime start, DateTime end) async {
@@ -146,172 +175,117 @@ class SessionProvider with ChangeNotifier {
     return sessions.where((s) => s.isClosed).toList();
   }
 
-  Future<String?> _savePhotoFile(XFile photo, String prefix) async {
-    try {
-      final photoDir = await _photoDirectory;
+  Future<String?> takePoopPhoto() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.camera);
 
-      // Create unique filename only, which will be our relative path
-      final timestamp = DateTime.now().microsecondsSinceEpoch;
-      final extension = path.extension(photo.path).toLowerCase();
-      final fileName = '$prefix\_$timestamp$extension';
+    if (image != null) {
+      final String photoFileName = 'poop_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final photosDir = await _photoDirectory;
+      final String photoPath = path.join(photosDir, photoFileName);
+      
+      // Move the temporary file to a permanent location
+      await File(image.path).copy(photoPath);
+      await File(image.path).delete();
+      
+      return _getRelativePath(photoPath);
+    }
+    return null;
+  }
 
-      // Full path for saving the file
-      final savePath = path.join(photoDir, fileName);
+  Future<String?> takeSessionPhoto() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.camera);
 
-      final bytes = await photo.readAsBytes();
+    if (image != null) {
+      final String photoFileName = 'session_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final photosDir = await _photoDirectory;
+      final String photoPath = path.join(photosDir, photoFileName);
+      
+      // Move the temporary file to a permanent location
+      await File(image.path).copy(photoPath);
+      await File(image.path).delete();
+      
+      return _getRelativePath(photoPath);
+    }
+    return null;
+  }
 
-      if (bytes.isEmpty) {
-        print('Source photo is empty');
-        return null;
-      }
+  Future<String?> savePhotoOnly(XFile image, String prefix) async {
+    final String photoFileName = '${prefix}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final photosDir = await _photoDirectory;
+    final String photoPath = path.join(photosDir, photoFileName);
+    
+    await File(image.path).copy(photoPath);
+    await File(image.path).delete();
+    
+    return _getRelativePath(photoPath);
+  }
 
-      // Write to a temporary file first
-      final tempPath = '$savePath.tmp';
-      final tempFile = File(tempPath);
-      await tempFile.writeAsBytes(bytes, flush: true);
+  Future<void> saveSessionPhoto(Session session, XFile image) async {
+    final photoPath = await savePhotoOnly(image, 'session');
+    if (photoPath != null) {
+      final updatedSession = session.copyWith(
+        sessionPhotoPath: photoPath,
+        hasSessionPhoto: true,
+      );
+      await updateSession(updatedSession);
+    }
+  }
 
-      // Add a small delay to ensure file system operations complete
-      await Future.delayed(const Duration(milliseconds: 100));
-
-      // Verify the temp file exists and has content
-      if (await tempFile.exists()) {
-        final size = await tempFile.length();
-        if (size > 0) {
-          // Move to final location
-          final destinationFile = File(savePath);
-          await tempFile.rename(savePath);
-
-          // Add another small delay for the file move
-          await Future.delayed(const Duration(milliseconds: 100));
-
-          // Final verification
-          if (await destinationFile.exists()) {
-            final finalSize = await destinationFile.length();
-            if (finalSize > 0) {
-              print('Successfully saved photo at $savePath with size $finalSize bytes');
-              // Return just the filename as the relative path
-              return fileName;
-            }
-          }
+  Future<void> saveAbnormalPoopPhoto(Session session, XFile image) async {
+    final photoPath = await savePhotoOnly(image, 'poop');
+    if (photoPath != null) {
+      // Update the most recent poop entry that has abnormal color
+      for (int i = 0; i < session.poopEntries.length; i++) {
+        var entry = session.poopEntries[i];
+        if (entry.color == PoopColor.abnormal && !entry.hasPhoto) {
+          final updatedEntry = entry.copyWith(
+            photoPath: photoPath,
+            hasPhoto: true,
+          );
+          final updatedEntries = List.of(session.poopEntries);
+          updatedEntries[i] = updatedEntry;
+          final updatedSession = session.copyWith(poopEntries: updatedEntries);
+          await updateSession(updatedSession);
+          break;
         }
       }
-
-      print('Failed to verify saved photo at $savePath');
-      return null;
-    } catch (e) {
-      print('Error saving photo file: $e');
-      return null;
     }
   }
 
-  Future<bool> _deletePhotoFile(String? path) async {
-    if (path == null) return false;
-
-    try {
-      final file = File(path);
-      if (await file.exists()) {
-        await file.delete();
-        return true;
-      }
-    } catch (e) {
-      print('Error deleting file $path: $e');
-    }
-    return false;
-  }
-
-  Future<void> _updateSession(Session updatedSession) async {
-    await _db.updateSession(updatedSession);
-    _currentSession = updatedSession;
-    notifyListeners();
+  Future<void> deletePhotoOnly(String photoPath) async {
+    await _deletePhotoFile(photoPath);
   }
 
   Future<void> removeSessionPhoto(Session session) async {
     if (session.sessionPhotoPath != null) {
-      final absolutePath = await _getAbsolutePath(session.sessionPhotoPath!);
-      final deleted = await _deletePhotoFile(absolutePath);
-      if (deleted) {
-        print('Successfully deleted session photo: ${session.sessionPhotoPath}');
-      }
-      await _updateSession(session.copyWith(
+      await _deletePhotoFile(session.sessionPhotoPath!);
+      final updatedSession = session.copyWith(
         sessionPhotoPath: null,
         hasSessionPhoto: false,
-      ));
+      );
+      await updateSession(updatedSession);
     }
   }
 
   Future<void> removeAbnormalPoopPhoto(Session session) async {
-    if (session.abnormalPoopPhotoPath != null) {
-      final absolutePath = await _getAbsolutePath(session.abnormalPoopPhotoPath!);
-      final deleted = await _deletePhotoFile(absolutePath);
-      if (deleted) {
-        print('Successfully deleted abnormal poop photo: ${session.abnormalPoopPhotoPath}');
-      }
-      await _updateSession(session.copyWith(
-        abnormalPoopPhotoPath: null,
-        hasAbnormalPoopPhoto: false,
-      ));
-    }
-  }
-
-  Future<void> saveSessionPhoto(Session session, XFile photo) async {
-    try {
-      final photoPath = await _savePhotoFile(photo, 'session');
-      if (photoPath != null) {
-        final oldPath = session.sessionPhotoPath;
-        if (oldPath != null) {
-          final absoluteOldPath = await _getAbsolutePath(oldPath);
-          await _deletePhotoFile(absoluteOldPath);
-        }
-
-        final updatedSession = session.copyWith(
-          sessionPhotoPath: photoPath,
-          hasSessionPhoto: true,
+    // Find and update the most recent poop entry that has a photo
+    for (int i = 0; i < session.poopEntries.length; i++) {
+      var entry = session.poopEntries[i];
+      if (entry.hasPhoto && entry.photoPath != null) {
+        await _deletePhotoFile(entry.photoPath!);
+        final updatedEntry = entry.copyWith(
+          photoPath: null,
+          hasPhoto: false,
         );
-
-        await _updateSession(updatedSession);
-        print('Successfully updated session with new photo: $photoPath');
-      } else {
-        print('Failed to save session photo');
+        final updatedEntries = List.of(session.poopEntries);
+        updatedEntries[i] = updatedEntry;
+        final updatedSession = session.copyWith(poopEntries: updatedEntries);
+        await updateSession(updatedSession);
+        break;
       }
-    } catch (e) {
-      print('Error in saveSessionPhoto: $e');
-      notifyListeners();
     }
-  }
-
-  Future<void> saveAbnormalPoopPhoto(Session session, XFile photo) async {
-    try {
-      final photoPath = await _savePhotoFile(photo, 'poop');
-      if (photoPath != null) {
-        final oldPath = session.abnormalPoopPhotoPath;
-        if (oldPath != null) {
-          final absoluteOldPath = await _getAbsolutePath(oldPath);
-          await _deletePhotoFile(absoluteOldPath);
-        }
-
-        final updatedSession = session.copyWith(
-          abnormalPoopPhotoPath: photoPath,
-          hasAbnormalPoopPhoto: true,
-        );
-
-        await _updateSession(updatedSession);
-        print('Successfully updated session with new abnormal poop photo: $photoPath');
-      } else {
-        print('Failed to save abnormal poop photo');
-      }
-    } catch (e) {
-      print('Error in saveAbnormalPoopPhoto: $e');
-      notifyListeners();
-    }
-  }
-
-  Future<String?> savePhotoOnly(XFile photo, String prefix) async {
-    return await _savePhotoFile(photo, prefix);
-  }
-
-  Future<bool> deletePhotoOnly(String photoPath) async {
-    final absolutePath = await _getAbsolutePath(photoPath);
-    return await _deletePhotoFile(absolutePath);
   }
 
   // Get the session that occurred before the given session
@@ -332,19 +306,134 @@ class SessionProvider with ChangeNotifier {
     return null;
   }
 
-  Future<void> deleteSession(Session session) async {
-    // Delete associated photos if they exist
-    if (session.hasSessionPhoto && session.sessionPhotoPath != null) {
-      await _deletePhotoFile(session.sessionPhotoPath!);
+  // Entry Management Methods
+  Future<PeeEntry> addPeeEntry({
+    required int sessionId,
+    required PeeAmount amount,
+    String? remarks,
+    required DateTime time,
+  }) async {
+    final entry = PeeEntry(
+      sessionId: sessionId,
+      amount: amount,
+      remarks: remarks,
+      time: time,
+    );
+    
+    final savedEntry = await _db.createPeeEntry(entry);
+    if (_currentSession?.id == sessionId) {
+      _currentSession!.addPeeEntry(savedEntry);
+      notifyListeners();
     }
-    if (session.hasAbnormalPoopPhoto && session.abnormalPoopPhotoPath != null) {
-      await _deletePhotoFile(session.abnormalPoopPhotoPath!);
+    await loadSessions(); // Refresh the session list
+    return savedEntry;
+  }
+
+  Future<PoopEntry> addPoopEntry({
+    required int sessionId,
+    required PoopAmount amount,
+    required PoopConsistency consistency,
+    required PoopColor color,
+    required DateTime time,
+    String? photoPath,
+    bool hasPhoto = false,
+  }) async {
+    final entry = PoopEntry(
+      sessionId: sessionId,
+      amount: amount,
+      consistency: consistency,
+      color: color,
+      time: time,
+      photoPath: photoPath,
+      hasPhoto: hasPhoto,
+    );
+    
+    final savedEntry = await _db.createPoopEntry(entry);
+    if (_currentSession?.id == sessionId) {
+      _currentSession!.addPoopEntry(savedEntry);
+      notifyListeners();
+    }
+    await loadSessions(); // Refresh the session list
+    return savedEntry;
+  }
+
+  Future<MilkEntry> addMilkEntry({
+    required int sessionId,
+    required int amount,
+    required DateTime time,
+  }) async {
+    final entry = MilkEntry(
+      sessionId: sessionId,
+      amount: amount,
+      time: time,
+    );
+    
+    final savedEntry = await _db.createMilkEntry(entry);
+    if (_currentSession?.id == sessionId) {
+      _currentSession!.addMilkEntry(savedEntry);
+      notifyListeners();
+    }
+    await loadSessions(); // Refresh the session list
+    return savedEntry;
+  }
+
+  Future<void> updateSessionWithMilkEntries(Session session) async {
+    // First update the main session
+    await _db.updateSession(session);
+
+    // Update milk entries in a transaction
+    await _db.updateSessionMilkEntries(session.id!, session.milkEntries);
+
+    // Update state if this is the current session
+    if (_currentSession?.id == session.id) {
+      _currentSession = await _db.loadSessionWithEntries(session);
+      notifyListeners();
     }
 
-    // Delete from database
-    await _db.deleteSession(session.id!);
-
-    // Reload sessions
     await loadSessions();
+  }
+
+  // Deletion methods
+  Future<bool> deletePeeEntry(int entryId, int sessionId) async {
+    final deleted = await _db.deletePeeEntry(entryId);
+    if (deleted > 0) {
+      if (_currentSession?.id == sessionId) {
+        _currentSession!.removePeeEntry(entryId);
+        notifyListeners();
+      }
+      await loadSessions();
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> deletePoopEntry(int entryId, int sessionId, {String? photoPath}) async {
+    if (photoPath != null) {
+      await _deletePhotoFile(photoPath);
+    }
+
+    final deleted = await _db.deletePoopEntry(entryId);
+    if (deleted > 0) {
+      if (_currentSession?.id == sessionId) {
+        _currentSession!.removePoopEntry(entryId);
+        notifyListeners();
+      }
+      await loadSessions();
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> deleteMilkEntry(int entryId, int sessionId) async {
+    final deleted = await _db.deleteMilkEntry(entryId);
+    if (deleted > 0) {
+      if (_currentSession?.id == sessionId) {
+        _currentSession!.removeMilkEntry(entryId);
+        notifyListeners();
+      }
+      await loadSessions();
+      return true;
+    }
+    return false;
   }
 }
