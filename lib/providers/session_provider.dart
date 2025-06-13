@@ -102,29 +102,44 @@ class SessionProvider with ChangeNotifier {
   }
 
   Future<void> deleteSession(Session session) async {
-    // Delete all photos associated with poop entries
+    // Update in-memory state first
+    if (_currentSession?.id == session.id) {
+      _currentSession = null;
+    }
+
+    _sessions.removeWhere((s) => s.id == session.id);
+    notifyListeners();
+
+    // Delete photos first
     for (final entry in session.poopEntries) {
       if (entry.hasPhoto && entry.photoPath != null) {
         await _deletePhotoFile(entry.photoPath!);
       }
     }
 
-    // Delete the session photo if it exists
     if (session.hasSessionPhoto && session.sessionPhotoPath != null) {
       await _deletePhotoFile(session.sessionPhotoPath!);
     }
 
+    // Delete from DB
     await _db.deleteSession(session.id!);
-
-    // Reload sessions
-    await loadSessions();
   }
 
   Future<void> updateCurrentSession(Session updatedSession) async {
     if (_currentSession?.id == null) return;
-    await _db.updateSession(updatedSession);
+
+    // Update in-memory state first
     _currentSession = updatedSession;
+
+    final index = _sessions.indexWhere((s) => s.id == updatedSession.id);
+    if (index != -1) {
+      _sessions[index] = updatedSession;
+    }
+
     notifyListeners();
+
+    // Update DB state
+    await _db.updateSession(updatedSession);
   }
 
   Future<void> updateDefaultSleepTime() async {
@@ -139,10 +154,22 @@ class SessionProvider with ChangeNotifier {
 
   Future<void> closeSession(Session session, DateTime sleepTime) async {
     final updatedSession = session.copyWith(sleepTime: sleepTime, isClosed: true);
-    await _db.updateSession(updatedSession);
+
+    // Update in-memory state first
+    if (_currentSession?.id == session.id) {
+      _currentSession = null;
+    }
+
+    final index = _sessions.indexWhere((s) => s.id == session.id);
+    if (index != -1) {
+      _sessions[index] = updatedSession;
+    }
+
     _lastSleepTime = sleepTime;
-    _currentSession = null;
-    await loadSessions();
+    notifyListeners();
+
+    // Update DB state
+    await _db.updateSession(updatedSession);
   }
 
   Future<void> closeCurrentSession() async {
@@ -320,12 +347,17 @@ class SessionProvider with ChangeNotifier {
       time: time,
     );
 
+    // Create entry in DB
     final savedEntry = await _db.createPeeEntry(entry);
+
+    // Update in-memory state
     if (_currentSession?.id == sessionId) {
       _currentSession!.addPeeEntry(savedEntry);
-      notifyListeners();
     }
-    await loadSessions(); // Refresh the session list
+
+    // Notify listeners after updating in-memory state but before additional DB operations
+    notifyListeners();
+
     return savedEntry;
   }
 
@@ -348,12 +380,17 @@ class SessionProvider with ChangeNotifier {
       hasPhoto: hasPhoto,
     );
 
+    // Create entry in DB
     final savedEntry = await _db.createPoopEntry(entry);
+
+    // Update in-memory state
     if (_currentSession?.id == sessionId) {
       _currentSession!.addPoopEntry(savedEntry);
-      notifyListeners();
     }
-    await loadSessions(); // Refresh the session list
+
+    // Notify listeners after updating in-memory state but before additional DB operations
+    notifyListeners();
+
     return savedEntry;
   }
 
@@ -368,106 +405,157 @@ class SessionProvider with ChangeNotifier {
       time: time,
     );
 
+    // Create entry in DB
     final savedEntry = await _db.createMilkEntry(entry);
+
+    // Update in-memory state
     if (_currentSession?.id == sessionId) {
       _currentSession!.addMilkEntry(savedEntry);
-      notifyListeners();
     }
-    await loadSessions(); // Refresh the session list
+
+    // Notify listeners after updating in-memory state but before additional DB operations
+    notifyListeners();
+
     return savedEntry;
   }
 
   Future<void> updateSessionWithMilkEntries(Session session) async {
-    // First update the main session
-    await _db.updateSession(session);
-
-    // Update milk entries in a transaction
-    await _db.updateSessionMilkEntries(session.id!, session.milkEntries);
-
-    // Update state if this is the current session
+    // Update in-memory state first
     if (_currentSession?.id == session.id) {
-      _currentSession = await _db.loadSessionWithEntries(session);
-      notifyListeners();
+      _currentSession = session;
     }
 
-    await loadSessions();
+    final index = _sessions.indexWhere((s) => s.id == session.id);
+    if (index != -1) {
+      _sessions[index] = session;
+    }
+
+    // Notify listeners after updating in-memory state but before DB operations
+    notifyListeners();
+
+    // Update DB state
+    await _db.updateSession(session);
+    await _db.updateSessionMilkEntries(session.id!, session.milkEntries);
   }
 
   Future<void> updateSessionWithPeeEntries(Session session) async {
-    // First update the main session
-    await _db.updateSession(session);
-
-    // Update pee entries in a transaction
-    await _db.updateSessionPeeEntries(session.id!, session.peeEntries);
-
-    // Update state if this is the current session
+    // Update in-memory state first
     if (_currentSession?.id == session.id) {
-      _currentSession = await _db.loadSessionWithEntries(session);
-      notifyListeners();
+      _currentSession = session;
     }
 
-    await loadSessions();
+    final index = _sessions.indexWhere((s) => s.id == session.id);
+    if (index != -1) {
+      _sessions[index] = session;
+    }
+
+    // Notify listeners after updating in-memory state but before DB operations
+    notifyListeners();
+
+    // Update DB state
+    await _db.updateSession(session);
+    await _db.updateSessionPeeEntries(session.id!, session.peeEntries);
   }
 
   Future<void> updateSessionWithPoopEntries(Session session) async {
-    // First update the main session
-    await _db.updateSession(session);
-
-    // Update poop entries in a transaction
-    await _db.updateSessionPoopEntries(session.id!, session.poopEntries);
-
-    // Update state if this is the current session
+    // Update in-memory state first
     if (_currentSession?.id == session.id) {
-      _currentSession = await _db.loadSessionWithEntries(session);
-      notifyListeners();
+      _currentSession = session;
     }
 
-    await loadSessions();
+    final index = _sessions.indexWhere((s) => s.id == session.id);
+    if (index != -1) {
+      _sessions[index] = session;
+    }
+
+    // Notify listeners after updating in-memory state but before DB operations
+    notifyListeners();
+
+    // Update DB state
+    await _db.updateSession(session);
+    await _db.updateSessionPoopEntries(session.id!, session.poopEntries);
   }
 
   // Milk Entry Methods
 
   // Deletion methods
   Future<bool> deletePeeEntry(int entryId, int sessionId) async {
-    final deleted = await _db.deletePeeEntry(entryId);
-    if (deleted > 0) {
-      if (_currentSession?.id == sessionId) {
-        _currentSession!.removePeeEntry(entryId);
-        notifyListeners();
-      }
-      await loadSessions();
-      return true;
+    // Update in-memory state first
+    bool found = false;
+
+    if (_currentSession?.id == sessionId) {
+      _currentSession!.removePeeEntry(entryId);
+      found = true;
     }
-    return false;
+
+    final index = _sessions.indexWhere((s) => s.id == sessionId);
+    if (index != -1) {
+      _sessions[index].removePeeEntry(entryId);
+      found = true;
+    }
+
+    // Only notify if we found and updated the entry in memory
+    if (found) {
+      notifyListeners();
+    }
+
+    // Delete from DB after UI is updated
+    final deleted = await _db.deletePeeEntry(entryId);
+    return deleted > 0;
   }
 
   Future<bool> deletePoopEntry(int entryId, int sessionId, {String? photoPath}) async {
+    // Delete photo file if it exists
     if (photoPath != null) {
       await _deletePhotoFile(photoPath);
     }
 
-    final deleted = await _db.deletePoopEntry(entryId);
-    if (deleted > 0) {
-      if (_currentSession?.id == sessionId) {
-        _currentSession!.removePoopEntry(entryId);
-        notifyListeners();
-      }
-      await loadSessions();
-      return true;
+    // Update in-memory state first
+    bool found = false;
+
+    if (_currentSession?.id == sessionId) {
+      _currentSession!.removePoopEntry(entryId);
+      found = true;
     }
-    return false;
+
+    final index = _sessions.indexWhere((s) => s.id == sessionId);
+    if (index != -1) {
+      _sessions[index].removePoopEntry(entryId);
+      found = true;
+    }
+
+    // Only notify if we found and updated the entry in memory
+    if (found) {
+      notifyListeners();
+    }
+
+    // Delete from DB after UI is updated
+    final deleted = await _db.deletePoopEntry(entryId);
+    return deleted > 0;
   }
 
   Future<bool> deleteMilkEntry(int entryId, int sessionId) async {
-    final deleted = await _db.deleteMilkEntry(entryId);
-    if (deleted > 0) {
-      if (_currentSession?.id == sessionId) {
-        _currentSession!.removeMilkEntry(entryId);
-        notifyListeners();
-      }
-      await loadSessions();
-      return true;
+    // Update in-memory state first
+    bool found = false;
+
+    if (_currentSession?.id == sessionId) {
+      _currentSession!.removeMilkEntry(entryId);
+      found = true;
     }
-    return false;
+
+    final index = _sessions.indexWhere((s) => s.id == sessionId);
+    if (index != -1) {
+      _sessions[index].removeMilkEntry(entryId);
+      found = true;
+    }
+
+    // Only notify if we found and updated the entry in memory
+    if (found) {
+      notifyListeners();
+    }
+
+    // Delete from DB after UI is updated
+    final deleted = await _db.deleteMilkEntry(entryId);
+    return deleted > 0;
   }
 }
