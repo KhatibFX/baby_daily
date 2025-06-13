@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../models/session.dart';
 import '../../models/milk_entry.dart';
+import '../../models/session.dart';
 import '../../providers/session_provider.dart';
 import '../session_utils.dart';
 import '../session_widgets.dart';
-import '../shared.dart';
 
 class MilkSectionCard extends StatelessWidget {
   final Session session;
@@ -63,7 +62,38 @@ class MilkSectionCard extends StatelessWidget {
                 separatorBuilder: (context, index) => Divider(),
                 itemBuilder: (context, index) {
                   final entry = session.milkEntries[index];
-                  return _buildMilkEntry(context, entry);
+                  return _MilkEntryItem(
+                    entry: entry,
+                    session: session,
+                    onUpdate: (updatedEntry) async {
+                      if (!session.isClosed && entry.id != null) {
+                        // In session screen - persist immediately
+                        // Provider will handle UI update through notifyListeners
+                        final provider = context.read<SessionProvider>();
+                        final updatedEntries = List.of(session.milkEntries);
+                        updatedEntries[index] = updatedEntry;
+                        await provider.updateSessionWithMilkEntries(
+                            session.copyWith(milkEntries: updatedEntries));
+                      } else {
+                        // In edit screen - only update memory
+                        final updatedEntries = List.of(session.milkEntries);
+                        updatedEntries[index] = updatedEntry;
+                        onSessionChanged(session.copyWith(milkEntries: updatedEntries));
+                      }
+                    },
+                    onDelete: () async {
+                      if (!session.isClosed && entry.id != null) {
+                        // In session screen - persist immediately
+                        // Provider will handle UI update through notifyListeners
+                        final provider = context.read<SessionProvider>();
+                        await provider.deleteMilkEntry(entry.id!, session.id!);
+                      } else {
+                        // In edit screen or entry without ID - just update memory
+                        final updatedEntries = List.of(session.milkEntries)..removeAt(index);
+                        onSessionChanged(session.copyWith(milkEntries: updatedEntries));
+                      }
+                    },
+                  );
                 },
               ),
           ],
@@ -74,7 +104,7 @@ class MilkSectionCard extends StatelessWidget {
 
   void _addNewMilkEntry(BuildContext context) async {
     if (session.id == null) return;
-    
+
     if (!session.isClosed) {
       // In session screen - persist immediately to DB
       // The provider will handle updating the UI through notifyListeners
@@ -95,22 +125,6 @@ class MilkSectionCard extends StatelessWidget {
         milkEntries: List.of(session.milkEntries)..add(newEntry),
       ));
     }
-  }
-
-  Widget _buildMilkEntry(BuildContext context, MilkEntry entry) {
-    return GestureDetector(
-      onTap: () {
-        FocusScope.of(context).unfocus();
-        _showEditDialog(context, entry);
-      },
-      child: Card(
-        // ...existing entry card UI code...
-      ),
-    );
-  }
-
-  void _showEditDialog(BuildContext context, MilkEntry entry) {
-    // Implementation for showing edit dialog
   }
 }
 

@@ -59,24 +59,30 @@ class PeeSectionCard extends StatelessWidget {
                     entry: entry,
                     session: session,
                     onUpdate: (updatedEntry) async {
-                      final updatedEntries = List.of(session.peeEntries);
-                      updatedEntries[index] = updatedEntry;
-                      onSessionChanged(session.copyWith(peeEntries: updatedEntries));
-                      
-                      // The database update will happen when the user saves the session
-                      if (session.isClosed) {
+                      if (!session.isClosed && entry.id != null) {
+                        // In session screen - persist immediately through provider
                         final provider = context.read<SessionProvider>();
+                        final updatedEntries = List.of(session.peeEntries);
+                        updatedEntries[index] = updatedEntry;
                         await provider.updateSession(session.copyWith(peeEntries: updatedEntries));
+                      } else {
+                        // In edit screen - only update memory
+                        final updatedEntries = List.of(session.peeEntries);
+                        updatedEntries[index] = updatedEntry;
+                        onSessionChanged(session.copyWith(peeEntries: updatedEntries));
                       }
                     },
-                    onDelete: entry.id != null ? () async {
-                      final provider = context.read<SessionProvider>();
-                      final success = await provider.deletePeeEntry(entry.id!, session.id!);
-                      if (success) {
+                    onDelete: () async {
+                      if (!session.isClosed && entry.id != null) {
+                        // In session screen - persist immediately through provider
+                        final provider = context.read<SessionProvider>();
+                        await provider.deletePeeEntry(entry.id!, session.id!);
+                      } else {
+                        // In edit screen or entry without ID - just update memory
                         final updatedEntries = List.of(session.peeEntries)..removeAt(index);
                         onSessionChanged(session.copyWith(peeEntries: updatedEntries));
                       }
-                    } : null,
+                    },
                   );
                 },
               ),
@@ -88,13 +94,26 @@ class PeeSectionCard extends StatelessWidget {
 
   Future<void> _addNewPeeEntry(BuildContext context) async {
     if (session.id == null) return;
-    
-    final provider = context.read<SessionProvider>();
-    await provider.addPeeEntry(
-      sessionId: session.id!,
-      amount: PeeAmount.na,
-      time: truncateToMinute(DateTime.now()),
-    );
+
+    if (!session.isClosed) {
+      // In session screen - persist immediately through provider
+      final provider = context.read<SessionProvider>();
+      await provider.addPeeEntry(
+        sessionId: session.id!,
+        amount: PeeAmount.na,
+        time: truncateToMinute(DateTime.now()),
+      );
+    } else {
+      // In edit screen - keep in memory only
+      final newEntry = PeeEntry(
+        sessionId: session.id!,
+        amount: PeeAmount.na,
+        time: truncateToMinute(DateTime.now()),
+      );
+      onSessionChanged(session.copyWith(
+        peeEntries: List.of(session.peeEntries)..add(newEntry),
+      ));
+    }
   }
 }
 

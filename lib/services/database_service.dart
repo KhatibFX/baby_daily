@@ -267,6 +267,16 @@ class DatabaseService {
     return result.map((json) => PeeEntry.fromMap(json)).toList();
   }
 
+  Future<int> updatePeeEntry(PeeEntry entry) async {
+    final db = await instance.database;
+    return db.update(
+      'pee_entries',
+      entry.toMap(),
+      where: 'id = ?',
+      whereArgs: [entry.id],
+    );
+  }
+
   Future<int> deletePeeEntry(int id) async {
     final db = await instance.database;
     return await db.delete(
@@ -292,6 +302,16 @@ class DatabaseService {
       orderBy: 'time DESC'
     );
     return result.map((json) => PoopEntry.fromMap(json)).toList();
+  }
+
+  Future<int> updatePoopEntry(PoopEntry entry) async {
+    final db = await instance.database;
+    return db.update(
+      'poop_entries',
+      entry.toMap(),
+      where: 'id = ?',
+      whereArgs: [entry.id],
+    );
   }
 
   Future<int> deletePoopEntry(int id) async {

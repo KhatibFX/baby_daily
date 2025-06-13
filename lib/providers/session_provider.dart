@@ -329,6 +329,22 @@ class SessionProvider with ChangeNotifier {
     return savedEntry;
   }
 
+  Future<bool> updatePeeEntry(PeeEntry entry) async {
+    final updated = await _db.updatePeeEntry(entry);
+    if (updated > 0) {
+      if (_currentSession?.id == entry.sessionId) {
+        final index = _currentSession!.peeEntries.indexWhere((e) => e.id == entry.id);
+        if (index != -1) {
+          _currentSession!.peeEntries[index] = entry;
+          notifyListeners();
+        }
+      }
+      await loadSessions();
+      return true;
+    }
+    return false;
+  }
+
   Future<PoopEntry> addPoopEntry({
     required int sessionId,
     required PoopAmount amount,
@@ -355,6 +371,22 @@ class SessionProvider with ChangeNotifier {
     }
     await loadSessions(); // Refresh the session list
     return savedEntry;
+  }
+
+  Future<bool> updatePoopEntry(PoopEntry entry) async {
+    final updated = await _db.updatePoopEntry(entry);
+    if (updated > 0) {
+      if (_currentSession?.id == entry.sessionId) {
+        final index = _currentSession!.poopEntries.indexWhere((e) => e.id == entry.id);
+        if (index != -1) {
+          _currentSession!.poopEntries[index] = entry;
+          notifyListeners();
+        }
+      }
+      await loadSessions();
+      return true;
+    }
+    return false;
   }
 
   Future<MilkEntry> addMilkEntry({

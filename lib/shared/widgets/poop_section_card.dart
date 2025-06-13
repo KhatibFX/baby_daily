@@ -62,24 +62,30 @@ class PoopSectionCard extends StatelessWidget {
                     session: session,
                     isEditing: isEditing,
                     onUpdate: (updatedEntry) async {
-                      final updatedEntries = List.of(session.poopEntries);
-                      updatedEntries[index] = updatedEntry;
-                      onSessionChanged(session.copyWith(poopEntries: updatedEntries));
-
-                      // The database update will happen when the user saves the session
-                      if (session.isClosed) {
+                      if (!session.isClosed && entry.id != null) {
+                        // In session screen - persist immediately through provider
                         final provider = context.read<SessionProvider>();
+                        final updatedEntries = List.of(session.poopEntries);
+                        updatedEntries[index] = updatedEntry;
                         await provider.updateSession(session.copyWith(poopEntries: updatedEntries));
+                      } else {
+                        // In edit screen - only update memory
+                        final updatedEntries = List.of(session.poopEntries);
+                        updatedEntries[index] = updatedEntry;
+                        onSessionChanged(session.copyWith(poopEntries: updatedEntries));
                       }
                     },
-                    onDelete: entry.id != null ? () async {
-                      final provider = context.read<SessionProvider>();
-                      final success = await provider.deletePoopEntry(entry.id!, session.id!, photoPath: entry.photoPath);
-                      if (success) {
+                    onDelete: () async {
+                      if (!session.isClosed && entry.id != null) {
+                        // In session screen - persist immediately through provider
+                        final provider = context.read<SessionProvider>();
+                        await provider.deletePoopEntry(entry.id!, session.id!, photoPath: entry.photoPath);
+                      } else {
+                        // In edit screen or entry without ID - just update memory
                         final updatedEntries = List.of(session.poopEntries)..removeAt(index);
                         onSessionChanged(session.copyWith(poopEntries: updatedEntries));
                       }
-                    } : null,
+                    },
                   );
                 },
               ),
@@ -92,17 +98,29 @@ class PoopSectionCard extends StatelessWidget {
   Future<void> _addNewPoopEntry(BuildContext context) async {
     if (session.id == null) return;
     
-    final provider = context.read<SessionProvider>();
-    final savedEntry = await provider.addPoopEntry(
-      sessionId: session.id!,
-      amount: PoopAmount.na,
-      time: truncateToMinute(DateTime.now()),
-      consistency: PoopConsistency.normal,
-      color: PoopColor.yellow,
-    );
-    
-    final updatedEntries = List.of(session.poopEntries)..add(savedEntry);
-    onSessionChanged(session.copyWith(poopEntries: updatedEntries));
+    if (!session.isClosed) {
+      // In session screen - persist immediately through provider
+      final provider = context.read<SessionProvider>();
+      await provider.addPoopEntry(
+        sessionId: session.id!,
+        amount: PoopAmount.na,
+        consistency: PoopConsistency.normal,
+        color: PoopColor.yellow,
+        time: truncateToMinute(DateTime.now()),
+      );
+    } else {
+      // In edit screen - keep in memory only
+      final newEntry = PoopEntry(
+        sessionId: session.id!,
+        amount: PoopAmount.na,
+        consistency: PoopConsistency.normal,
+        color: PoopColor.yellow,
+        time: truncateToMinute(DateTime.now()),
+      );
+      onSessionChanged(session.copyWith(
+        poopEntries: List.of(session.poopEntries)..add(newEntry),
+      ));
+    }
   }
 }
 
