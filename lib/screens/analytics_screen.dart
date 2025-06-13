@@ -134,15 +134,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       (sum, session) => sum + session.milkIntake,
     );
 
-    final totalSleepDuration = _sessions.fold<Duration>(
-      Duration.zero,
-      (sum, session) {
-        if (session.sleepTime != null) {
-          return sum + session.sleepTime!.difference(session.wakeUpTime);
-        }
-        return sum;
-      },
-    );
+    var totalSleepDuration = Duration.zero;
+    // Calculate total sleep duration by looking at consecutive sessions
+    for (int i = 0; i < _sessions.length - 1; i++) {
+      final newerSession = _sessions[i];
+      final olderSession = _sessions[i + 1];
+      if (olderSession.sleepTime != null) {
+        totalSleepDuration += newerSession.wakeUpTime.difference(olderSession.sleepTime!);
+      }
+    }
 
     return Column(
       children: [
