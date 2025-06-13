@@ -1,15 +1,15 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:provider/provider.dart';
 import 'package:path/path.dart' as path;
+import 'package:provider/provider.dart';
 
-import '../../models/session.dart';
 import '../../models/poop_entry.dart';
+import '../../models/session.dart';
 import '../../providers/session_provider.dart';
 import '../session_utils.dart';
 import '../session_widgets.dart';
-import '../shared.dart';
 
 class PoopSectionCard extends StatelessWidget {
   final Session session;
@@ -40,7 +40,10 @@ class PoopSectionCard extends StatelessWidget {
                 ),
                 IconButton(
                   icon: Icon(Icons.add),
-                  onPressed: () => _addNewPoopEntry(context),
+                  onPressed: () {
+                    FocusScope.of(context).unfocus();
+                    _addNewPoopEntry(context);
+                  },
                 ),
               ],
             ),
@@ -79,7 +82,8 @@ class PoopSectionCard extends StatelessWidget {
                       if (!session.isClosed && entry.id != null) {
                         // In session screen - persist immediately through provider
                         final provider = context.read<SessionProvider>();
-                        await provider.deletePoopEntry(entry.id!, session.id!, photoPath: entry.photoPath);
+                        await provider.deletePoopEntry(entry.id!, session.id!,
+                            photoPath: entry.photoPath);
                       } else {
                         // In edit screen or entry without ID - just update memory
                         final updatedEntries = List.of(session.poopEntries)..removeAt(index);
@@ -97,7 +101,7 @@ class PoopSectionCard extends StatelessWidget {
 
   Future<void> _addNewPoopEntry(BuildContext context) async {
     if (session.id == null) return;
-    
+
     if (!session.isClosed) {
       // In session screen - persist immediately through provider
       final provider = context.read<SessionProvider>();
@@ -165,7 +169,9 @@ class _PoopEntryItem extends StatelessWidget {
                           if (selected) {
                             onUpdate(entry.copyWith(
                               amount: amount,
-                              consistency: amount == PoopAmount.na ? PoopConsistency.normal : entry.consistency,
+                              consistency: amount == PoopAmount.na
+                                  ? PoopConsistency.normal
+                                  : entry.consistency,
                               color: amount == PoopAmount.na ? PoopColor.yellow : entry.color,
                             ));
                           }
@@ -179,7 +185,10 @@ class _PoopEntryItem extends StatelessWidget {
             if (onDelete != null)
               IconButton(
                 icon: Icon(Icons.delete),
-                onPressed: onDelete,
+                onPressed: () {
+                  FocusScope.of(context).unfocus();
+                  onDelete!();
+                },
               ),
           ],
         ),
@@ -283,11 +292,11 @@ class _PoopEntryItem extends StatelessWidget {
     if (image != null) {
       final String photoFileName = 'poop_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final String photoPath = path.join(path.dirname(image.path), photoFileName);
-      
+
       // Move the temporary file to a permanent location
       await File(image.path).copy(photoPath);
       await File(image.path).delete();
-      
+
       onUpdate(entry.copyWith(photoPath: photoPath, hasPhoto: true));
     }
   }

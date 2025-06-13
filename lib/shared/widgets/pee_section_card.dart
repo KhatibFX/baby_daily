@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../models/session.dart';
 import '../../models/pee_entry.dart';
+import '../../models/session.dart';
 import '../../providers/session_provider.dart';
 import '../session_utils.dart';
 import '../session_widgets.dart';
-import '../shared.dart';
 
 class PeeSectionCard extends StatelessWidget {
   final Session session;
@@ -162,66 +161,65 @@ class _PeeEntryItemState extends State<_PeeEntryItem> {
   Widget build(BuildContext context) {
     final sessionProvider = context.read<SessionProvider>();
 
-    return GestureDetector(
-      onTap: () {
-        FocusScope.of(context).unfocus();
-      },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Wrap(
-                  spacing: 8.0,
-                  children: PeeAmount.values.map((amount) {
-                    return ChoiceChip(
-                      label: Text(amount.name),
-                      selected: widget.entry.amount == amount,
-                      onSelected: (selected) {
-                        if (selected) {
-                          widget.onUpdate(widget.entry.copyWith(amount: amount));
-                        }
-                      },
-                    );
-                  }).toList(),
-                ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Wrap(
+                spacing: 8.0,
+                children: PeeAmount.values.map((amount) {
+                  return ChoiceChip(
+                    label: Text(amount.name),
+                    selected: widget.entry.amount == amount,
+                    onSelected: (selected) {
+                      if (selected) {
+                        widget.onUpdate(widget.entry.copyWith(amount: amount));
+                      }
+                    },
+                  );
+                }).toList(),
               ),
-              if (widget.onDelete != null)
-                IconButton(
-                  icon: Icon(Icons.delete),
-                  onPressed: widget.onDelete,
-                ),
-            ],
-          ),
-          if (widget.entry.amount != PeeAmount.na) ...[
-            SizedBox(height: 8),
-            TimePickerRow(
-              time: widget.entry.time,
-              placeholder: 'Time not set',
-              icon: Icons.access_time,
-              firstDate: widget.session.wakeUpTime,
-              lastDate: widget.session.sleepTime ?? DateTime.now(),
-              onValidate: (time) => isValidActivityTime(context, time, widget.session, sessionProvider),
-              onTimeSelected: (time) {
-                widget.onUpdate(widget.entry.copyWith(time: time));
-              },
             ),
-            SizedBox(height: 8),
-            TextField(
-              decoration: InputDecoration(
-                labelText: 'Remarks',
-                border: OutlineInputBorder(),
+            if (widget.onDelete != null)
+              IconButton(
+                icon: Icon(Icons.delete),
+                onPressed: () {
+                  FocusScope.of(context).unfocus();
+                  widget.onDelete!();
+                },
               ),
-              controller: _remarksController,
-              onChanged: (value) {
-                widget.onUpdate(widget.entry.copyWith(remarks: value));
-              },
-            ),
           ],
+        ),
+        if (widget.entry.amount != PeeAmount.na) ...[
+          SizedBox(height: 8),
+          TimePickerRow(
+            time: widget.entry.time,
+            placeholder: 'Time not set',
+            icon: Icons.access_time,
+            firstDate: widget.session.wakeUpTime,
+            lastDate: widget.session.sleepTime ?? DateTime.now(),
+            onValidate: (time) =>
+                isValidActivityTime(context, time, widget.session, sessionProvider),
+            onTimeSelected: (time) {
+              widget.onUpdate(widget.entry.copyWith(time: time));
+            },
+          ),
+          SizedBox(height: 8),
+          TextField(
+            decoration: InputDecoration(
+              labelText: 'Remarks',
+              border: OutlineInputBorder(),
+            ),
+            controller: _remarksController,
+            onChanged: (value) {
+              widget.onUpdate(widget.entry.copyWith(remarks: value));
+            },
+          ),
         ],
-      ),
+      ],
     );
   }
 }

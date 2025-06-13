@@ -186,7 +186,6 @@ class _MilkEntryItemState extends State<_MilkEntryItem> {
                 keyboardType: TextInputType.number,
                 controller: _amountController,
                 onChanged: (value) {
-                  FocusScope.of(context).unfocus();
                   final amount = int.tryParse(value) ?? 0;
                   widget.onUpdate(widget.entry.copyWith(amount: amount));
                 },
@@ -196,7 +195,10 @@ class _MilkEntryItemState extends State<_MilkEntryItem> {
               SizedBox(width: 8),
               IconButton(
                 icon: Icon(Icons.delete),
-                onPressed: widget.onDelete,
+                onPressed: () {
+                  FocusScope.of(context).unfocus();
+                  widget.onDelete!();
+                },
               ),
             ],
           ],

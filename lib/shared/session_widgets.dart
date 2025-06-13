@@ -25,6 +25,7 @@ class TimePickerButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextButton(
       onPressed: () async {
+        FocusScope.of(context).unfocus();
         final newDateTime = await showDateTimePicker(
           context: context,
           initialDate: time ?? truncateToMinute(DateTime.now()),
@@ -72,6 +73,7 @@ class NowButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextButton(
       onPressed: () async {
+        FocusScope.of(context).unfocus();
         final now = truncateToMinute(DateTime.now());
         if (await onValidate(now)) {
           onTimeSelected(now);
