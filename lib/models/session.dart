@@ -38,11 +38,11 @@ class Session {
 
   // Helper methods to manage entries
   void addPeeEntry(PeeEntry entry) {
-    peeEntries.insert(0, entry); // Add to the beginning to maintain time order
+    peeEntries.add(entry);  // Add to the end to maintain time order (ascending)
   }
 
   void addPoopEntry(PoopEntry entry) {
-    poopEntries.insert(0, entry);
+    poopEntries.add(entry);  // Add to the end to maintain time order (ascending)
   }
 
   void addMilkEntry(MilkEntry entry) {

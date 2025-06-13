@@ -15,11 +15,13 @@ class ExpandableEntryListItem<T> {
 class ExpandableEntryList<T> extends StatefulWidget {
   final List<ExpandableEntryListItem<T>> items;
   final Widget? header;
+  final int? initialExpandedIndex;
 
   const ExpandableEntryList({
     Key? key,
     required this.items,
     this.header,
+    this.initialExpandedIndex,
   }) : super(key: key);
 
   @override
@@ -32,9 +34,24 @@ class _ExpandableEntryListState<T> extends State<ExpandableEntryList<T>> {
   @override
   void initState() {
     super.initState();
-    // Expand the last entry by default
-    if (widget.items.isNotEmpty) {
-      _expandedIndex = widget.items.length - 1;
+    // Use initialExpandedIndex if provided, otherwise expand the last entry
+    _expandedIndex = widget.initialExpandedIndex ?? (widget.items.isEmpty ? null : widget.items.length - 1);
+  }
+
+  @override
+  void didUpdateWidget(ExpandableEntryList<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If items were added, expand the newest one
+    if (widget.items.length > oldWidget.items.length) {
+      setState(() {
+        _expandedIndex = widget.items.length - 1;
+      });
+    }
+    // If initialExpandedIndex changed, update expanded index
+    else if (widget.initialExpandedIndex != null && widget.initialExpandedIndex != oldWidget.initialExpandedIndex) {
+      setState(() {
+        _expandedIndex = widget.initialExpandedIndex;
+      });
     }
   }
 
