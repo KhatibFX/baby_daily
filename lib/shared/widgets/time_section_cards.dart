@@ -35,17 +35,34 @@ class WakeUpTimeCard extends StatelessWidget {
                 final firstDate = prevSession?.sleepTime ?? DateTime.now().subtract(Duration(days: 7));
                 final lastDate = session.sleepTime ?? DateTime.now();
 
-                return TimePickerRow(
-                  time: session.wakeUpTime,
-                  placeholder: 'Not set',
-                  icon: Icons.access_time,
-                  firstDate: firstDate,
-                  lastDate: lastDate,
-                  onValidate: (time) => isValidWakeUpTime(context, time, session, provider),
-                  onTimeSelected: (time) {
-                    final updatedSession = session.copyWith(wakeUpTime: time);
-                    onSessionChanged(updatedSession);
-                  },
+                // Calculate sleep duration if there's a previous session
+                final sleepDuration = prevSession?.sleepTime != null 
+                  ? session.wakeUpTime.difference(prevSession!.sleepTime!)
+                  : null;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TimePickerRow(
+                      time: session.wakeUpTime,
+                      placeholder: 'Not set',
+                      icon: Icons.access_time,
+                      firstDate: firstDate,
+                      lastDate: lastDate,
+                      onValidate: (time) => isValidWakeUpTime(context, time, session, provider),
+                      onTimeSelected: (time) {
+                        final updatedSession = session.copyWith(wakeUpTime: time);
+                        onSessionChanged(updatedSession);
+                      },
+                    ),
+                    if (sleepDuration != null) ...[
+                      SizedBox(height: 8),
+                      Text(
+                        'Sleep duration: ${sleepDuration.inHours}h ${sleepDuration.inMinutes % 60}m',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
+                  ],
                 );
               },
             ),
