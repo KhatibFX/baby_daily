@@ -1,15 +1,15 @@
 import 'dart:io';
-import 'package:path/path.dart' as path;
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-// intl import has been moved to session_widgets.dart
+import 'package:path/path.dart' as path;
 import 'package:provider/provider.dart';
 
 import '../models/session.dart';
 import '../providers/session_provider.dart';
 import '../shared/session_utils.dart';
 import '../shared/session_widgets.dart';
+import '../shared/shared.dart';
 
 class SessionScreen extends StatefulWidget {
   @override
@@ -64,10 +64,7 @@ class _SessionScreenState extends State<SessionScreen> {
             // Hide keyboard when tapping outside text fields
             FocusScope.of(context).unfocus();
           },
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(16.0),
-            // Hide keyboard when scrolling
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          child: KeyboardAwareScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -78,31 +75,15 @@ class _SessionScreenState extends State<SessionScreen> {
                 _buildVitaminSection(context, session, sessionProvider),
                 _buildPhotoSection(context, session, sessionProvider),
                 SizedBox(height: 20),
-                if (!session.isClosed) ...[
-                  _buildSleepTimeSection(context, session, sessionProvider),
-                  SizedBox(height: 20),
-                  Center(
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        if (session.sleepTime == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Please set a sleep time before closing the session'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                          return;
-                        }
-                        await sessionProvider.closeCurrentSession();
-                      },
-                      child: Text('Close Session'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
+                _buildSleepTimeSection(context, session, sessionProvider),
+                SizedBox(height: 20),
+                SessionActionsBar(
+                  showCloseButton: !session.isClosed,
+                  onClose: () => sessionProvider.closeCurrentSession(),
+                  errorMessage: session.sleepTime == null
+                      ? 'Please set a sleep time before closing the session'
+                      : null,
+                ),
               ],
             ),
           ),
@@ -281,7 +262,8 @@ class _SessionScreenState extends State<SessionScreen> {
                         provider.updateCurrentSession(
                           session.copyWith(
                             poopAmount: amount,
-                            poopConsistency: amount == PoopAmount.na ? PoopConsistency.normal : null,
+                            poopConsistency:
+                                amount == PoopAmount.na ? PoopConsistency.normal : null,
                             poopColor: amount == PoopAmount.na ? PoopColor.yellow : null,
                             poopTime: amount == PoopAmount.na ? null : session.poopTime,
                           ),
@@ -481,7 +463,7 @@ class _SessionScreenState extends State<SessionScreen> {
     final photoDir = await provider.photoDirectory;
     final fullPath = path.join(photoDir, relativePath);
     print('Full photo path constructed: $fullPath');
-    
+
     final file = File(fullPath);
     if (await file.exists()) {
       final size = await file.length();

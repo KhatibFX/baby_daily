@@ -8,6 +8,7 @@ import '../models/session.dart';
 import '../providers/session_provider.dart';
 import '../shared/session_utils.dart';
 import '../shared/session_widgets.dart';
+import '../shared/shared.dart';
 
 class EditSessionScreen extends StatefulWidget {
   final Session originalSession;
@@ -50,27 +51,7 @@ class _EditSessionScreenState extends State<EditSessionScreen> {
 
   Future<bool> _onWillPop() async {
     if (!_hasChanges) return true;
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Discard Changes?'),
-        content: Text('You have unsaved changes. Do you want to discard them?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text('Discard'),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-          ),
-        ],
-      ),
-    );
-    
-    return result ?? false;
+    return showDiscardChangesDialog(context: context);
   }
 
   @override
@@ -84,27 +65,13 @@ class _EditSessionScreenState extends State<EditSessionScreen> {
           actions: [
             TextButton(
               onPressed: () async {
-                await showDialog<bool>(
+                final discard = await showDiscardChangesDialog(
                   context: context,
-                  builder: (context) => AlertDialog(
-                    title: Text('Discard Changes?'),
-                    content: Text('Do you want to discard all changes?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: Text('Cancel'),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          Navigator.of(context).pop();
-                        },
-                        child: Text('Discard'),
-                        style: TextButton.styleFrom(foregroundColor: Colors.red),
-                      ),
-                    ],
-                  ),
+                  message: 'Do you want to discard all changes?',
                 );
+                if (discard && mounted) {
+                  Navigator.of(context).pop();
+                }
               },
               child: Text(
                 'Cancel',
@@ -132,8 +99,7 @@ class _EditSessionScreenState extends State<EditSessionScreen> {
           ],
         ),
         body: Consumer<SessionProvider>(
-          builder: (context, provider, child) => SingleChildScrollView(
-            padding: EdgeInsets.all(16.0),
+          builder: (context, provider, child) => KeyboardAwareScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
