@@ -10,6 +10,7 @@ import '../providers/session_provider.dart';
 import '../shared/session_utils.dart';
 import '../shared/session_widgets.dart';
 import '../shared/shared.dart';
+import '../shared/widgets/poop_section_card.dart';
 
 class SessionScreen extends StatefulWidget {
   @override
@@ -236,142 +237,11 @@ class _SessionScreenState extends State<SessionScreen> {
     Session session,
     SessionProvider provider,
   ) {
-    return Card(
-      child: Padding(
-        padding: EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Poop',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            SizedBox(height: 8),
-            Text('Amount'),
-            Container(
-              width: double.infinity,
-              child: Wrap(
-                spacing: 8.0,
-                children: PoopAmount.values.map((amount) {
-                  return ChoiceChip(
-                    label: Text(amount.name),
-                    selected: session.poopAmount == amount,
-                    onSelected: (bool selected) {
-                      if (selected) {
-                        // When amount is set to na, reset other poop-related fields
-                        provider.updateCurrentSession(
-                          session.copyWith(
-                            poopAmount: amount,
-                            poopConsistency:
-                                amount == PoopAmount.na ? PoopConsistency.normal : null,
-                            poopColor: amount == PoopAmount.na ? PoopColor.yellow : null,
-                            poopTime: amount == PoopAmount.na ? null : session.poopTime,
-                          ),
-                        );
-                      }
-                    },
-                  );
-                }).toList(),
-              ),
-            ),
-            if (session.poopAmount != PoopAmount.na) ...[
-              SizedBox(height: 8),
-              TimePickerRow(
-                time: session.poopTime,
-                placeholder: 'Time not set',
-                icon: Icons.access_time,
-                firstDate: session.wakeUpTime,
-                lastDate: session.sleepTime ?? DateTime.now(),
-                onValidate: (time) => isValidActivityTime(context, time, session, provider),
-                onTimeSelected: (time) async {
-                  await provider.updateCurrentSession(
-                    session.copyWith(poopTime: time),
-                  );
-                },
-              ),
-              Text('Consistency'),
-              SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                child: Wrap(
-                  spacing: 8.0,
-                  children: PoopConsistency.values.map((consistency) {
-                    return ChoiceChip(
-                      label: Text(consistency.name),
-                      selected: session.poopConsistency == consistency,
-                      onSelected: (bool selected) {
-                        if (selected) {
-                          provider.updateCurrentSession(
-                            session.copyWith(poopConsistency: consistency),
-                          );
-                        }
-                      },
-                    );
-                  }).toList(),
-                ),
-              ),
-              Text('Color'),
-              SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                child: Wrap(
-                  spacing: 8.0,
-                  children: PoopColor.values.map((color) {
-                    return ChoiceChip(
-                      label: Text(color.name),
-                      selected: session.poopColor == color,
-                      onSelected: (bool selected) {
-                        if (selected) {
-                          provider.updateCurrentSession(
-                            session.copyWith(poopColor: color),
-                          );
-                        }
-                      },
-                    );
-                  }).toList(),
-                ),
-              ),
-              if (session.poopColor == PoopColor.abnormal) ...[
-                SizedBox(height: 8),
-                if (!session.hasAbnormalPoopPhoto)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      ElevatedButton.icon(
-                        onPressed: () async {
-                          final ImagePicker picker = ImagePicker();
-                          final XFile? image = await picker.pickImage(
-                            source: ImageSource.camera,
-                          );
-                          if (image != null) {
-                            await provider.saveAbnormalPoopPhoto(session, image);
-                          }
-                        },
-                        icon: Icon(Icons.camera_alt),
-                        label: Text('Camera'),
-                      ),
-                      ElevatedButton.icon(
-                        onPressed: () async {
-                          final ImagePicker picker = ImagePicker();
-                          final XFile? image = await picker.pickImage(
-                            source: ImageSource.gallery,
-                          );
-                          if (image != null) {
-                            await provider.saveAbnormalPoopPhoto(session, image);
-                          }
-                        },
-                        icon: Icon(Icons.photo_library),
-                        label: Text('Gallery'),
-                      ),
-                    ],
-                  )
-                else
-                  _buildPoopPhotoSection(context, session, provider),
-              ],
-            ],
-          ],
-        ),
-      ),
+    return PoopSectionCard(
+      session: session,
+      onSessionChanged: (updatedSession) async {
+        await provider.updateCurrentSession(updatedSession);
+      },
     );
   }
 
