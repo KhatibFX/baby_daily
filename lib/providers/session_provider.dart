@@ -6,10 +6,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
-import '../models/session.dart';
+import '../models/milk_entry.dart';
 import '../models/pee_entry.dart';
 import '../models/poop_entry.dart';
-import '../models/milk_entry.dart';
+import '../models/session.dart';
 import '../services/database_service.dart';
 
 class SessionProvider with ChangeNotifier {
@@ -108,12 +108,12 @@ class SessionProvider with ChangeNotifier {
         await _deletePhotoFile(entry.photoPath!);
       }
     }
-    
+
     // Delete the session photo if it exists
     if (session.hasSessionPhoto && session.sessionPhotoPath != null) {
       await _deletePhotoFile(session.sessionPhotoPath!);
     }
-    
+
     await _db.deleteSession(session.id!);
 
     // Reload sessions
@@ -183,11 +183,11 @@ class SessionProvider with ChangeNotifier {
       final String photoFileName = 'poop_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final photosDir = await _photoDirectory;
       final String photoPath = path.join(photosDir, photoFileName);
-      
+
       // Move the temporary file to a permanent location
       await File(image.path).copy(photoPath);
       await File(image.path).delete();
-      
+
       return _getRelativePath(photoPath);
     }
     return null;
@@ -201,11 +201,11 @@ class SessionProvider with ChangeNotifier {
       final String photoFileName = 'session_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final photosDir = await _photoDirectory;
       final String photoPath = path.join(photosDir, photoFileName);
-      
+
       // Move the temporary file to a permanent location
       await File(image.path).copy(photoPath);
       await File(image.path).delete();
-      
+
       return _getRelativePath(photoPath);
     }
     return null;
@@ -215,10 +215,10 @@ class SessionProvider with ChangeNotifier {
     final String photoFileName = '${prefix}_${DateTime.now().millisecondsSinceEpoch}.jpg';
     final photosDir = await _photoDirectory;
     final String photoPath = path.join(photosDir, photoFileName);
-    
+
     await File(image.path).copy(photoPath);
     await File(image.path).delete();
-    
+
     return _getRelativePath(photoPath);
   }
 
@@ -319,7 +319,7 @@ class SessionProvider with ChangeNotifier {
       remarks: remarks,
       time: time,
     );
-    
+
     final savedEntry = await _db.createPeeEntry(entry);
     if (_currentSession?.id == sessionId) {
       _currentSession!.addPeeEntry(savedEntry);
@@ -327,22 +327,6 @@ class SessionProvider with ChangeNotifier {
     }
     await loadSessions(); // Refresh the session list
     return savedEntry;
-  }
-
-  Future<bool> updatePeeEntry(PeeEntry entry) async {
-    final updated = await _db.updatePeeEntry(entry);
-    if (updated > 0) {
-      if (_currentSession?.id == entry.sessionId) {
-        final index = _currentSession!.peeEntries.indexWhere((e) => e.id == entry.id);
-        if (index != -1) {
-          _currentSession!.peeEntries[index] = entry;
-          notifyListeners();
-        }
-      }
-      await loadSessions();
-      return true;
-    }
-    return false;
   }
 
   Future<PoopEntry> addPoopEntry({
@@ -363,7 +347,7 @@ class SessionProvider with ChangeNotifier {
       photoPath: photoPath,
       hasPhoto: hasPhoto,
     );
-    
+
     final savedEntry = await _db.createPoopEntry(entry);
     if (_currentSession?.id == sessionId) {
       _currentSession!.addPoopEntry(savedEntry);
@@ -371,22 +355,6 @@ class SessionProvider with ChangeNotifier {
     }
     await loadSessions(); // Refresh the session list
     return savedEntry;
-  }
-
-  Future<bool> updatePoopEntry(PoopEntry entry) async {
-    final updated = await _db.updatePoopEntry(entry);
-    if (updated > 0) {
-      if (_currentSession?.id == entry.sessionId) {
-        final index = _currentSession!.poopEntries.indexWhere((e) => e.id == entry.id);
-        if (index != -1) {
-          _currentSession!.poopEntries[index] = entry;
-          notifyListeners();
-        }
-      }
-      await loadSessions();
-      return true;
-    }
-    return false;
   }
 
   Future<MilkEntry> addMilkEntry({
@@ -399,7 +367,7 @@ class SessionProvider with ChangeNotifier {
       amount: amount,
       time: time,
     );
-    
+
     final savedEntry = await _db.createMilkEntry(entry);
     if (_currentSession?.id == sessionId) {
       _currentSession!.addMilkEntry(savedEntry);
@@ -424,6 +392,40 @@ class SessionProvider with ChangeNotifier {
 
     await loadSessions();
   }
+
+  Future<void> updateSessionWithPeeEntries(Session session) async {
+    // First update the main session
+    await _db.updateSession(session);
+
+    // Update pee entries in a transaction
+    await _db.updateSessionPeeEntries(session.id!, session.peeEntries);
+
+    // Update state if this is the current session
+    if (_currentSession?.id == session.id) {
+      _currentSession = await _db.loadSessionWithEntries(session);
+      notifyListeners();
+    }
+
+    await loadSessions();
+  }
+
+  Future<void> updateSessionWithPoopEntries(Session session) async {
+    // First update the main session
+    await _db.updateSession(session);
+
+    // Update poop entries in a transaction
+    await _db.updateSessionPoopEntries(session.id!, session.poopEntries);
+
+    // Update state if this is the current session
+    if (_currentSession?.id == session.id) {
+      _currentSession = await _db.loadSessionWithEntries(session);
+      notifyListeners();
+    }
+
+    await loadSessions();
+  }
+
+  // Milk Entry Methods
 
   // Deletion methods
   Future<bool> deletePeeEntry(int entryId, int sessionId) async {

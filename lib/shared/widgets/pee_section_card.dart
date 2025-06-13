@@ -63,7 +63,7 @@ class PeeSectionCard extends StatelessWidget {
                         final provider = context.read<SessionProvider>();
                         final updatedEntries = List.of(session.peeEntries);
                         updatedEntries[index] = updatedEntry;
-                        await provider.updateSession(session.copyWith(peeEntries: updatedEntries));
+                        await provider.updateSessionWithPeeEntries(session.copyWith(peeEntries: updatedEntries));
                       } else {
                         // In edit screen - only update memory
                         final updatedEntries = List.of(session.peeEntries);

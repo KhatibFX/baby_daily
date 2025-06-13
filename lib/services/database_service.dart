@@ -267,16 +267,6 @@ class DatabaseService {
     return result.map((json) => PeeEntry.fromMap(json)).toList();
   }
 
-  Future<int> updatePeeEntry(PeeEntry entry) async {
-    final db = await instance.database;
-    return db.update(
-      'pee_entries',
-      entry.toMap(),
-      where: 'id = ?',
-      whereArgs: [entry.id],
-    );
-  }
-
   Future<int> deletePeeEntry(int id) async {
     final db = await instance.database;
     return await db.delete(
@@ -284,6 +274,23 @@ class DatabaseService {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  Future<void> updateSessionPeeEntries(int sessionId, List<PeeEntry> entries) async {
+    final db = await instance.database;
+    await db.transaction((txn) async {
+      // Delete all existing entries
+      await txn.delete(
+        'pee_entries',
+        where: 'session_id = ?',
+        whereArgs: [sessionId],
+      );
+
+      // Insert new entries
+      for (final entry in entries) {
+        await txn.insert('pee_entries', entry.toMap());
+      }
+    });
   }
 
   // Poop Entry Methods
@@ -304,16 +311,6 @@ class DatabaseService {
     return result.map((json) => PoopEntry.fromMap(json)).toList();
   }
 
-  Future<int> updatePoopEntry(PoopEntry entry) async {
-    final db = await instance.database;
-    return db.update(
-      'poop_entries',
-      entry.toMap(),
-      where: 'id = ?',
-      whereArgs: [entry.id],
-    );
-  }
-
   Future<int> deletePoopEntry(int id) async {
     final db = await instance.database;
     return await db.delete(
@@ -321,6 +318,23 @@ class DatabaseService {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  Future<void> updateSessionPoopEntries(int sessionId, List<PoopEntry> entries) async {
+    final db = await instance.database;
+    await db.transaction((txn) async {
+      // Delete all existing entries
+      await txn.delete(
+        'poop_entries',
+        where: 'session_id = ?',
+        whereArgs: [sessionId],
+      );
+
+      // Insert new entries
+      for (final entry in entries) {
+        await txn.insert('poop_entries', entry.toMap());
+      }
+    });
   }
 
   // Milk Entry Methods

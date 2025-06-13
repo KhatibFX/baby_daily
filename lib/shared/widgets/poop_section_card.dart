@@ -70,7 +70,7 @@ class PoopSectionCard extends StatelessWidget {
                         final provider = context.read<SessionProvider>();
                         final updatedEntries = List.of(session.poopEntries);
                         updatedEntries[index] = updatedEntry;
-                        await provider.updateSession(session.copyWith(poopEntries: updatedEntries));
+                        await provider.updateSessionWithPoopEntries(session.copyWith(poopEntries: updatedEntries));
                       } else {
                         // In edit screen - only update memory
                         final updatedEntries = List.of(session.poopEntries);
