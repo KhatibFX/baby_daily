@@ -6,6 +6,7 @@ import '../../models/session.dart';
 import '../../providers/session_provider.dart';
 import '../session_utils.dart';
 import '../session_widgets.dart';
+import 'expandable_entry_list.dart';
 
 class PeeSectionCard extends StatelessWidget {
   final Session session;
@@ -47,48 +48,54 @@ class PeeSectionCard extends StatelessWidget {
                 child: Text('No pee entries recorded'),
               )
             else
-              ListView.separated(
-                shrinkWrap: true,
-                physics: NeverScrollableScrollPhysics(),
-                itemCount: session.peeEntries.length,
-                separatorBuilder: (context, index) => Divider(),
-                itemBuilder: (context, index) {
-                  final entry = session.peeEntries[index];
-                  return _PeeEntryItem(
-                    entry: entry,
-                    session: session,
-                    onUpdate: (updatedEntry) async {
-                      if (!session.isClosed && entry.id != null) {
-                        // In session screen - persist immediately through provider
-                        final provider = context.read<SessionProvider>();
-                        final updatedEntries = List.of(session.peeEntries);
-                        updatedEntries[index] = updatedEntry;
-                        await provider.updateSessionWithPeeEntries(session.copyWith(peeEntries: updatedEntries));
-                      } else {
-                        // In edit screen - only update memory
-                        final updatedEntries = List.of(session.peeEntries);
-                        updatedEntries[index] = updatedEntry;
-                        onSessionChanged(session.copyWith(peeEntries: updatedEntries));
-                      }
-                    },
-                    onDelete: () async {
-                      if (!session.isClosed && entry.id != null) {
-                        // In session screen - persist immediately through provider
-                        final provider = context.read<SessionProvider>();
-                        await provider.deletePeeEntry(entry.id!, session.id!);
-                      } else {
-                        // In edit screen or entry without ID - just update memory
-                        final updatedEntries = List.of(session.peeEntries)..removeAt(index);
-                        onSessionChanged(session.copyWith(peeEntries: updatedEntries));
-                      }
-                    },
+              ExpandableEntryList<MapEntry<int, PeeEntry>>(
+                items: session.peeEntries.asMap().entries.map((entry) {
+                  return ExpandableEntryListItem(
+                    data: entry,
+                    summaryText: (data) => '${data.value.amount.name} at ${_formatTime(data.value.time)}${data.value.remarks?.isNotEmpty == true ? ' - ${data.value.remarks}' : ''}',
+                    builder: (data, isExpanded) => _PeeEntryItem(
+                      entry: data.value,
+                      session: session,
+                      onUpdate: (updatedEntry) async {
+                        if (!session.isClosed && data.value.id != null) {
+                          final provider = context.read<SessionProvider>();
+                          final updatedEntries = List.of(session.peeEntries);
+                          updatedEntries[data.key] = updatedEntry;
+                          await provider.updateSessionWithPeeEntries(
+                              session.copyWith(peeEntries: updatedEntries));
+                        } else {
+                          final updatedEntries = List.of(session.peeEntries);
+                          updatedEntries[data.key] = updatedEntry;
+                          onSessionChanged(
+                              session.copyWith(peeEntries: updatedEntries));
+                        }
+                      },
+                      onDelete: data.key > 0
+                          ? () async {
+                              if (!session.isClosed && data.value.id != null) {
+                                final provider = context.read<SessionProvider>();
+                                await provider.deletePeeEntry(
+                                    data.value.id!, session.id!);
+                              } else {
+                                final updatedEntries = List.of(session.peeEntries)
+                                  ..removeAt(data.key);
+                                onSessionChanged(
+                                    session.copyWith(peeEntries: updatedEntries));
+                              }
+                            }
+                          : null,
+                    ),
                   );
-                },
+                }).toList(),
               ),
           ],
         ),
       ),
     );
+  }
+
+  String _formatTime(DateTime time) {
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
 
   Future<void> _addNewPeeEntry(BuildContext context) async {

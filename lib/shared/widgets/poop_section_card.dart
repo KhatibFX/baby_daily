@@ -10,6 +10,7 @@ import '../../models/session.dart';
 import '../../providers/session_provider.dart';
 import '../session_utils.dart';
 import '../session_widgets.dart';
+import 'expandable_entry_list.dart';
 
 class PoopSectionCard extends StatelessWidget {
   final Session session;
@@ -53,50 +54,59 @@ class PoopSectionCard extends StatelessWidget {
                 child: Text('No poop entries recorded'),
               )
             else
-              ListView.separated(
-                shrinkWrap: true,
-                physics: NeverScrollableScrollPhysics(),
-                itemCount: session.poopEntries.length,
-                separatorBuilder: (context, index) => Divider(),
-                itemBuilder: (context, index) {
-                  final entry = session.poopEntries[index];
-                  return _PoopEntryItem(
-                    entry: entry,
-                    session: session,
-                    isEditing: isEditing,
-                    onUpdate: (updatedEntry) async {
-                      if (!session.isClosed && entry.id != null) {
-                        // In session screen - persist immediately through provider
-                        final provider = context.read<SessionProvider>();
-                        final updatedEntries = List.of(session.poopEntries);
-                        updatedEntries[index] = updatedEntry;
-                        await provider.updateSessionWithPoopEntries(session.copyWith(poopEntries: updatedEntries));
-                      } else {
-                        // In edit screen - only update memory
-                        final updatedEntries = List.of(session.poopEntries);
-                        updatedEntries[index] = updatedEntry;
-                        onSessionChanged(session.copyWith(poopEntries: updatedEntries));
-                      }
-                    },
-                    onDelete: () async {
-                      if (!session.isClosed && entry.id != null) {
-                        // In session screen - persist immediately through provider
-                        final provider = context.read<SessionProvider>();
-                        await provider.deletePoopEntry(entry.id!, session.id!,
-                            photoPath: entry.photoPath);
-                      } else {
-                        // In edit screen or entry without ID - just update memory
-                        final updatedEntries = List.of(session.poopEntries)..removeAt(index);
-                        onSessionChanged(session.copyWith(poopEntries: updatedEntries));
-                      }
-                    },
+              ExpandableEntryList<MapEntry<int, PoopEntry>>(
+                items: session.poopEntries.asMap().entries.map((entry) {
+                  return ExpandableEntryListItem(
+                    data: entry,
+                    summaryText: (data) => 
+                        '${data.value.amount.name}, ${data.value.consistency.name}, ${data.value.color.name} at ${_formatTime(data.value.time)}${data.value.hasPhoto ? ' 📷' : ''}',
+                    builder: (data, isExpanded) => _PoopEntryItem(
+                      entry: data.value,
+                      session: session,
+                      isEditing: isEditing,
+                      onUpdate: (updatedEntry) async {
+                        if (!session.isClosed && data.value.id != null) {
+                          final provider = context.read<SessionProvider>();
+                          final updatedEntries = List.of(session.poopEntries);
+                          updatedEntries[data.key] = updatedEntry;
+                          await provider.updateSessionWithPoopEntries(
+                              session.copyWith(poopEntries: updatedEntries));
+                        } else {
+                          final updatedEntries = List.of(session.poopEntries);
+                          updatedEntries[data.key] = updatedEntry;
+                          onSessionChanged(
+                              session.copyWith(poopEntries: updatedEntries));
+                        }
+                      },
+                      onDelete: data.key > 0
+                          ? () async {
+                              if (!session.isClosed && data.value.id != null) {
+                                final provider = context.read<SessionProvider>();
+                                await provider.deletePoopEntry(
+                                  data.value.id!,
+                                  session.id!,
+                                  photoPath: data.value.photoPath,
+                                );
+                              } else {
+                                final updatedEntries = List.of(session.poopEntries)
+                                  ..removeAt(data.key);
+                                onSessionChanged(
+                                    session.copyWith(poopEntries: updatedEntries));
+                              }
+                            }
+                          : null,
+                    ),
                   );
-                },
+                }).toList(),
               ),
           ],
         ),
       ),
     );
+  }
+
+  String _formatTime(DateTime time) {
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
 
   Future<void> _addNewPoopEntry(BuildContext context) async {

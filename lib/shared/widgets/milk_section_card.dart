@@ -6,6 +6,7 @@ import '../../models/session.dart';
 import '../../providers/session_provider.dart';
 import '../session_utils.dart';
 import '../session_widgets.dart';
+import 'expandable_entry_list.dart';
 
 class MilkSectionCard extends StatelessWidget {
   final Session session;
@@ -55,51 +56,55 @@ class MilkSectionCard extends StatelessWidget {
                 child: Text('No milk intake recorded'),
               )
             else
-              ListView.separated(
-                shrinkWrap: true,
-                physics: NeverScrollableScrollPhysics(),
-                itemCount: session.milkEntries.length,
-                separatorBuilder: (context, index) => Divider(),
-                itemBuilder: (context, index) {
-                  final entry = session.milkEntries[index];
-                  return _MilkEntryItem(
-                    entry: entry,
-                    session: session,
-                    onUpdate: (updatedEntry) async {
-                      if (!session.isClosed && entry.id != null) {
-                        // In session screen - persist immediately
-                        // Provider will handle UI update through notifyListeners
-                        final provider = context.read<SessionProvider>();
-                        final updatedEntries = List.of(session.milkEntries);
-                        updatedEntries[index] = updatedEntry;
-                        await provider.updateSessionWithMilkEntries(
-                            session.copyWith(milkEntries: updatedEntries));
-                      } else {
-                        // In edit screen - only update memory
-                        final updatedEntries = List.of(session.milkEntries);
-                        updatedEntries[index] = updatedEntry;
-                        onSessionChanged(session.copyWith(milkEntries: updatedEntries));
-                      }
-                    },
-                    onDelete: () async {
-                      if (!session.isClosed && entry.id != null) {
-                        // In session screen - persist immediately
-                        // Provider will handle UI update through notifyListeners
-                        final provider = context.read<SessionProvider>();
-                        await provider.deleteMilkEntry(entry.id!, session.id!);
-                      } else {
-                        // In edit screen or entry without ID - just update memory
-                        final updatedEntries = List.of(session.milkEntries)..removeAt(index);
-                        onSessionChanged(session.copyWith(milkEntries: updatedEntries));
-                      }
-                    },
+              ExpandableEntryList<MapEntry<int, MilkEntry>>(
+                items: session.milkEntries.asMap().entries.map((entry) {
+                  return ExpandableEntryListItem(
+                    data: entry,
+                    summaryText: (data) =>
+                        '${data.value.amount} ml at ${_formatTime(data.value.time)}',
+                    builder: (data, isExpanded) => _MilkEntryItem(
+                      entry: data.value,
+                      session: session,
+                      onUpdate: (updatedEntry) async {
+                        if (!session.isClosed && data.value.id != null) {
+                          final provider = context.read<SessionProvider>();
+                          final updatedEntries = List.of(session.milkEntries);
+                          updatedEntries[data.key] = updatedEntry;
+                          await provider.updateSessionWithMilkEntries(
+                              session.copyWith(milkEntries: updatedEntries));
+                        } else {
+                          final updatedEntries = List.of(session.milkEntries);
+                          updatedEntries[data.key] = updatedEntry;
+                          onSessionChanged(
+                              session.copyWith(milkEntries: updatedEntries));
+                        }
+                      },
+                      onDelete: data.key > 0
+                          ? () async {
+                              if (!session.isClosed && data.value.id != null) {
+                                final provider = context.read<SessionProvider>();
+                                await provider.deleteMilkEntry(
+                                    data.value.id!, session.id!);
+                              } else {
+                                final updatedEntries = List.of(session.milkEntries)
+                                  ..removeAt(data.key);
+                                onSessionChanged(
+                                    session.copyWith(milkEntries: updatedEntries));
+                              }
+                            }
+                          : null,
+                    ),
                   );
-                },
+                }).toList(),
               ),
           ],
         ),
       ),
     );
+  }
+
+  String _formatTime(DateTime time) {
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
 
   void _addNewMilkEntry(BuildContext context) async {
