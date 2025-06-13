@@ -33,10 +33,49 @@ class SessionHistoryScreen extends StatelessWidget {
         final closedSessions = sessionProvider.sessions.where((s) => s.isClosed).toList();
         return Scaffold(
           body: ListView.builder(
-            itemCount: closedSessions.length,
+            itemCount: closedSessions.length * 2 - 1, // Double for separators, minus 1 for last item
             itemBuilder: (context, index) {
-              final session = closedSessions[index];
-              return _buildSessionCard(context, session, sessionProvider);
+              // If index is even, it's a session card
+              if (index % 2 == 0) {
+                final sessionIndex = index ~/ 2;
+                final session = closedSessions[sessionIndex];
+                return _buildSessionCard(context, session, sessionProvider);
+              } 
+              // If index is odd, it's a separator with sleep duration
+              else {
+                final newerSession = closedSessions[index ~/ 2]; // Index of the session above
+                final olderSession = closedSessions[(index ~/ 2) + 1]; // Index of the session below
+                if (olderSession.sleepTime != null) {
+                  final sleepDuration = newerSession.wakeUpTime.difference(olderSession.sleepTime!);
+                  return Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 32),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 2,
+                          height: 40,
+                          color: Theme.of(context).primaryColor.withOpacity(0.5),
+                        ),
+                        SizedBox(width: 8),
+                        Icon(
+                          Icons.bedtime,
+                          size: 16,
+                          color: Theme.of(context).primaryColor.withOpacity(0.7),
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          '${sleepDuration.inHours}h ${sleepDuration.inMinutes % 60}m of sleep',
+                          style: TextStyle(
+                            color: Theme.of(context).primaryColor,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return SizedBox(height: 4); // Small gap if no sleep data
+              }
             },
           ),
           floatingActionButton: FloatingActionButton(
