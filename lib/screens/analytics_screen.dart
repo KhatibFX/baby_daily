@@ -15,27 +15,37 @@ class AnalyticsScreen extends StatefulWidget {
 }
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
-  // Default to 7:20 AM today to 7:20 AM tomorrow
-  DateTime _startDate = DateTime(
-    DateTime.now().year,
-    DateTime.now().month,
-    DateTime.now().day,
-    7,
-    20,
-  );
-  DateTime _endDate = DateTime(
-    DateTime.now().year,
-    DateTime.now().month,
-    DateTime.now().day + 1,
-    7,
-    20,
-  );
+  late DateTime _startDate;
+  late DateTime _endDate;
   List<Session> _sessions = [];
 
   @override
   void initState() {
     super.initState();
+    _initializeDates();
     _loadSessions();
+  }
+
+  void _initializeDates() {
+    // Calculate the last 7:20 AM that occurred
+    _startDate = DateTime.now().hour >= 7 && DateTime.now().minute >= 20
+        ? DateTime(
+            DateTime.now().year,
+            DateTime.now().month,
+            DateTime.now().day,
+            7,
+            20,
+          )
+        : DateTime(
+            DateTime.now().year,
+            DateTime.now().month,
+            DateTime.now().day - 1,
+            7,
+            20,
+          );
+
+    // End time is always 24 hours after start time
+    _endDate = _startDate.add(Duration(days: 1));
   }
 
   Future<void> _loadSessions() async {
