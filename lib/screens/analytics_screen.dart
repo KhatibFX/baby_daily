@@ -5,10 +5,9 @@ import 'package:intl/intl.dart';
 import 'package:path/path.dart' as path;
 import 'package:provider/provider.dart';
 
-import '../shared/widgets/photo_view.dart';
-
 import '../models/session.dart';
 import '../providers/session_provider.dart';
+import '../shared/widgets/photo_view.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   @override
@@ -16,8 +15,21 @@ class AnalyticsScreen extends StatefulWidget {
 }
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
-  DateTime _startDate = DateTime.now().subtract(Duration(hours: 24));
-  DateTime _endDate = DateTime.now();
+  // Default to 7:20 AM today to 7:20 AM tomorrow
+  DateTime _startDate = DateTime(
+    DateTime.now().year,
+    DateTime.now().month,
+    DateTime.now().day,
+    7,
+    20,
+  );
+  DateTime _endDate = DateTime(
+    DateTime.now().year,
+    DateTime.now().month,
+    DateTime.now().day + 1,
+    7,
+    20,
+  );
   List<Session> _sessions = [];
 
   @override
@@ -79,8 +91,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   onPressed: () async {
                     final DateTimeRange? dateRange = await showDateRangePicker(
                       context: context,
-                      firstDate: DateTime.now().subtract(Duration(days: 365)),
-                      lastDate: DateTime.now(),
+                      firstDate: DateTime(2020), // Allow selecting dates from 2020
+                      lastDate: DateTime(2030), // Allow selecting dates until 2030
                       initialDateRange: DateTimeRange(
                         start: _startDate,
                         end: _endDate,
@@ -252,9 +264,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     return 'Pee: ${avgPee.toStringAsFixed(1)}, '
         'Poop: ${avgPoop.toStringAsFixed(1)}, '
         'Milk: ${avgMilk.toStringAsFixed(1)}';
-  }  String _getAvgSleepBetweenSessions() {
+  }
+
+  String _getAvgSleepBetweenSessions() {
     if (_sessions.length < 2) return 'N/A';
-    
+
     var totalDuration = Duration.zero;
     var count = 0;
 
@@ -265,7 +279,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     for (int i = 0; i < sortedSessions.length - 1; i++) {
       final newerSession = sortedSessions[i];
       final olderSession = sortedSessions[i + 1];
-      
+
       // Only calculate if we have both times
       if (olderSession.sleepTime != null) {
         final duration = newerSession.wakeUpTime.difference(olderSession.sleepTime!);
@@ -276,9 +290,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         }
       }
     }
-    
+
     if (count == 0) return 'N/A';
-    
+
     final avgMinutes = totalDuration.inMinutes ~/ count;
     return '${avgMinutes ~/ 60}h ${avgMinutes % 60}m';
   }
