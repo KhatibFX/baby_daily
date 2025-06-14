@@ -77,9 +77,10 @@ class SessionPhotoCard extends StatelessWidget {
     if (image != null) {
       final provider = Provider.of<SessionProvider>(context, listen: false);
       if (isEditing) {
-        // In edit mode, just save the new photo without deleting the old one
+        // In edit mode, just save the new photo without persisting to DB
         final String? newPhotoPath = await provider.savePhotoOnly(image, photoPrefix);
         if (newPhotoPath != null) {
+          // Update through EditSessionProvider to maintain edit mode state
           final updatedSession = updatePhotoInSession(session, newPhotoPath, true);
           onSessionChanged(updatedSession);
         }
@@ -156,7 +157,7 @@ class SessionPhotoCard extends StatelessWidget {
 
     final provider = Provider.of<SessionProvider>(context, listen: false);
     if (isEditing) {
-      // In edit mode, don't delete the file, just update the session state
+      // In edit mode, just update the session state
       final updatedSession = updatePhotoInSession(session, null, false);
       onSessionChanged(updatedSession);
     } else {

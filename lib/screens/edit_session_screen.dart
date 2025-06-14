@@ -17,19 +17,20 @@ class EditSessionScreen extends StatelessWidget {
 
   const EditSessionScreen({super.key, required this.originalSession});
 
-  Future<void> _cleanupDiscardedPhotos(BuildContext context, Session editingSession, Session originalSession) async {
+  Future<void> _cleanupDiscardedPhotos(
+      BuildContext context, Session editingSession, Session originalSession) async {
     final provider = context.read<SessionProvider>();
     // Clean up session photo if changed
-    if (editingSession.hasSessionPhoto && editingSession.sessionPhotoPath != originalSession.sessionPhotoPath) {
+    if (editingSession.hasSessionPhoto &&
+        editingSession.sessionPhotoPath != originalSession.sessionPhotoPath) {
       await provider.deletePhotoOnly(editingSession.sessionPhotoPath!);
     }
     // Clean up poop photos if changed
     for (final editedEntry in editingSession.poopEntries) {
       if (editedEntry.hasPhoto && editedEntry.photoPath != null) {
         // Find matching entry in original session
-        final matchingEntry = originalSession.poopEntries
-            .where((e) => e.id == editedEntry.id)
-            .firstOrNull;
+        final matchingEntry =
+            originalSession.poopEntries.where((e) => e.id == editedEntry.id).firstOrNull;
         // If no matching entry or photo path changed, delete the photo
         if (matchingEntry?.photoPath != editedEntry.photoPath) {
           await provider.deletePhotoOnly(editedEntry.photoPath!);
@@ -38,11 +39,12 @@ class EditSessionScreen extends StatelessWidget {
     }
   }
 
-  Future<void> _cleanupOldPhotos(BuildContext context, Session editingSession, Session originalSession) async {
+  Future<void> _cleanupOldPhotos(
+      BuildContext context, Session editingSession, Session originalSession) async {
     final provider = context.read<SessionProvider>();
-    
+
     // Clean up old session photo if changed
-    if (originalSession.hasSessionPhoto && 
+    if (originalSession.hasSessionPhoto &&
         originalSession.sessionPhotoPath != editingSession.sessionPhotoPath) {
       await provider.deletePhotoOnly(originalSession.sessionPhotoPath!);
     }
@@ -51,9 +53,8 @@ class EditSessionScreen extends StatelessWidget {
     for (final originalEntry in originalSession.poopEntries) {
       if (originalEntry.hasPhoto && originalEntry.photoPath != null) {
         // Find matching entry in edited session
-        final matchingEntry = editingSession.poopEntries
-            .where((e) => e.id == originalEntry.id)
-            .firstOrNull;
+        final matchingEntry =
+            editingSession.poopEntries.where((e) => e.id == originalEntry.id).firstOrNull;
         // If entry was changed or removed and had a different photo, delete the old photo
         if (matchingEntry?.photoPath != originalEntry.photoPath) {
           await provider.deletePhotoOnly(originalEntry.photoPath!);
@@ -104,7 +105,7 @@ class EditSessionScreen extends StatelessWidget {
                 onPressed: hasChanges
                     ? () async {
                         final sessionProvider = context.read<SessionProvider>();
-                        
+
                         // First clean up old photos that were replaced
                         await _cleanupOldPhotos(context, editingSession, originalSession);
 
@@ -215,6 +216,7 @@ class EditSessionScreen extends StatelessWidget {
 
   Widget _buildPhotoSection(BuildContext context, EditSessionProvider provider, Session session) {
     return SessionPhotoCard(
+      isEditing: true,
       session: session,
       onSessionChanged: (updatedSession) {
         provider.updateSession(updatedSession);
