@@ -1,9 +1,9 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as path;
 import 'package:provider/provider.dart';
+
+import '../../shared/widgets/photo_view.dart';
 
 import '../../models/session.dart';
 import '../../providers/session_provider.dart';
@@ -121,19 +121,8 @@ class SessionPhotoCard extends StatelessWidget {
 
           return Column(
             children: [
-              Image.file(
-                File(fullPath),
-                height: 200,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 200,
-                    width: double.infinity,
-                    color: Colors.grey[300],
-                    child: Center(child: Text('Failed to load image')),
-                  );
-                },
+              PhotoView(
+                photoPath: fullPath,
               ),
               SizedBox(height: 8),
               ElevatedButton.icon(

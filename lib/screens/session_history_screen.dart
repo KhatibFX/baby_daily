@@ -1,9 +1,10 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:path/path.dart' as path;
+
+import '../shared/widgets/photo_view.dart';
 
 import '../models/session.dart';
 import '../providers/session_provider.dart';
@@ -265,37 +266,21 @@ class SessionHistoryScreen extends StatelessWidget {
   ) {
     if (photoPath == null) return SizedBox.shrink();
 
-    return FutureBuilder<bool>(
-      future: File(photoPath).exists(),
-      builder: (context, snapshot) {
-        if (snapshot.data == true) {
-          return Column(
-            children: [
-              SizedBox(height: 8),
-              if (title.isNotEmpty)
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              Image.file(
-                File(photoPath),
-                height: 200,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 200,
-                    width: double.infinity,
-                    color: Colors.grey[300],
-                    child: Center(child: Text('Failed to load image')),
-                  );
-                },
-              ),
-            ],
+    return Consumer<SessionProvider>(
+      builder: (context, provider, _) => FutureBuilder<String>(
+        future: provider.photoDirectory,
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          
+          final fullPath = path.join(snapshot.data!, photoPath);
+          return PhotoView(
+            photoPath: fullPath,
+            title: title.isNotEmpty ? title : null,
           );
-        }
-        return SizedBox.shrink();
-      },
+        },
+      ),
     );
   }
 }
