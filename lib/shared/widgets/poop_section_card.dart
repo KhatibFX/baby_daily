@@ -1,8 +1,4 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:path/path.dart' as path;
 import 'package:provider/provider.dart';
 
 import '../../models/poop_entry.dart';
@@ -11,6 +7,7 @@ import '../../providers/session_provider.dart';
 import '../session_utils.dart';
 import '../session_widgets.dart';
 import 'expandable_entry_list.dart';
+import 'session_photo_card.dart';
 
 class PoopSectionCard extends StatelessWidget {
   final Session session;
@@ -58,7 +55,7 @@ class PoopSectionCard extends StatelessWidget {
                 items: session.poopEntries.asMap().entries.map((entry) {
                   return ExpandableEntryListItem(
                     data: entry,
-                    summaryText: (data) => 
+                    summaryText: (data) =>
                         '${data.value.amount.name}, ${data.value.consistency.name}, ${data.value.color.name} at ${_formatTime(data.value.time)}${data.value.hasPhoto ? ' 📷' : ''}',
                     builder: (data, isExpanded) => _PoopEntryItem(
                       entry: data.value,
@@ -74,8 +71,7 @@ class PoopSectionCard extends StatelessWidget {
                         } else {
                           final updatedEntries = List.of(session.poopEntries);
                           updatedEntries[data.key] = updatedEntry;
-                          onSessionChanged(
-                              session.copyWith(poopEntries: updatedEntries));
+                          onSessionChanged(session.copyWith(poopEntries: updatedEntries));
                         }
                       },
                       onDelete: data.key > 0
@@ -90,8 +86,7 @@ class PoopSectionCard extends StatelessWidget {
                               } else {
                                 final updatedEntries = List.of(session.poopEntries)
                                   ..removeAt(data.key);
-                                onSessionChanged(
-                                    session.copyWith(poopEntries: updatedEntries));
+                                onSessionChanged(session.copyWith(poopEntries: updatedEntries));
                               }
                             }
                           : null,
@@ -257,67 +252,33 @@ class _PoopEntryItem extends StatelessWidget {
   }
 
   Widget _buildPhotoSection(BuildContext context, SessionProvider sessionProvider) {
-    if (!isEditing && !entry.hasPhoto) {
+    if (entry.color != PoopColor.abnormal) {
       return Container();
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Abnormal Poop Photo'),
-        SizedBox(height: 8),
-        if (entry.hasPhoto && entry.photoPath != null) ...[
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8.0),
-            child: Image.file(
-              File(entry.photoPath!),
-              height: 200,
-              width: double.infinity,
-              fit: BoxFit.cover,
-            ),
-          ),
-          if (isEditing) ...[
-            SizedBox(height: 8),
-            ElevatedButton.icon(
-              onPressed: () => _deletePhoto(context, sessionProvider),
-              icon: Icon(Icons.delete),
-              label: Text('Delete Photo'),
-            ),
-          ],
-        ] else if (isEditing) ...[
-          ElevatedButton.icon(
-            onPressed: () => _takePhoto(context, sessionProvider),
-            icon: Icon(Icons.camera_alt),
-            label: Text('Take Photo'),
-          ),
-        ],
-      ],
+    return SessionPhotoCard(
+      session: session,
+      onSessionChanged: (updatedSession) {
+        // Find this entry in the updated session's poop entries and call onUpdate with it
+        final updatedEntry = updatedSession.poopEntries
+            .firstWhere((e) => e.id == entry.id || e.time == entry.time);
+        onUpdate(updatedEntry);
+      },
+      title: 'Abnormal Poop Photo',
+      photoPrefix: 'poop',
+      photoPath: entry.photoPath,
+      hasPhoto: entry.hasPhoto,
+      isEditing: isEditing,
+      updatePhotoInSession: (session, photoPath, hasPhoto) {
+        // Create a copy of the session with the updated poop entry
+        final updatedEntry = entry.copyWith(photoPath: photoPath, hasPhoto: hasPhoto);
+        final entryIndex = session.poopEntries.indexWhere(
+          (e) => e.id == entry.id || e.time == entry.time
+        );
+        final updatedEntries = List.of(session.poopEntries);
+        updatedEntries[entryIndex] = updatedEntry;
+        return session.copyWith(poopEntries: updatedEntries);
+      },
     );
-  }
-
-  Future<void> _takePhoto(BuildContext context, SessionProvider sessionProvider) async {
-    final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.camera);
-
-    if (image != null) {
-      final String photoFileName = 'poop_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final String photoPath = path.join(path.dirname(image.path), photoFileName);
-
-      // Move the temporary file to a permanent location
-      await File(image.path).copy(photoPath);
-      await File(image.path).delete();
-
-      onUpdate(entry.copyWith(photoPath: photoPath, hasPhoto: true));
-    }
-  }
-
-  Future<void> _deletePhoto(BuildContext context, SessionProvider sessionProvider) async {
-    if (entry.photoPath != null) {
-      final file = File(entry.photoPath!);
-      if (await file.exists()) {
-        await file.delete();
-      }
-      onUpdate(entry.copyWith(photoPath: null, hasPhoto: false));
-    }
   }
 }

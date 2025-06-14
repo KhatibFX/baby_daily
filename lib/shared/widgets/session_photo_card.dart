@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:path/path.dart' as path;
 
+import '../../models/poop_entry.dart';
 import '../../models/session.dart';
 import '../../providers/session_provider.dart';
 
@@ -82,11 +83,21 @@ class SessionPhotoCard extends StatelessWidget {
           onSessionChanged(updatedSession);
         }
       } else {
-        // For regular session mode, use the appropriate provider method
         if (photoPrefix == 'session') {
           await provider.saveSessionPhoto(session, image);
         } else if (photoPrefix == 'poop') {
-          await provider.saveAbnormalPoopPhoto(session, image);
+          // First save the photo and get its path
+          final String? newPhotoPath = await provider.savePhotoOnly(image, photoPrefix);
+          if (newPhotoPath != null) {
+            // Then update the session with the new photo path
+            final updatedSession = updatePhotoInSession(session, newPhotoPath, true);
+            // For open sessions, persist through provider
+            if (!session.isClosed) {
+              await provider.updateSessionWithPoopEntries(updatedSession);
+            } else {
+              onSessionChanged(updatedSession);
+            }
+          }
         }
       }
     }
@@ -151,7 +162,13 @@ class SessionPhotoCard extends StatelessWidget {
       if (photoPrefix == 'session') {
         await provider.removeSessionPhoto(session);
       } else if (photoPrefix == 'poop') {
-        await provider.removeAbnormalPoopPhoto(session);
+        await provider.deletePhotoOnly(photoPath!);
+        final updatedSession = updatePhotoInSession(session, null, false);
+        if (!session.isClosed) {
+          await provider.updateSessionWithPoopEntries(updatedSession);
+        } else {
+          onSessionChanged(updatedSession);
+        }
       }
     }
   }

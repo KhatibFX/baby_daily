@@ -260,23 +260,36 @@ class SessionProvider with ChangeNotifier {
     }
   }
 
-  Future<void> saveAbnormalPoopPhoto(Session session, XFile image) async {
+  Future<void> saveAbnormalPoopPhoto(Session session, XFile image, {DateTime? entryTime}) async {
     final photoPath = await savePhotoOnly(image, 'poop');
     if (photoPath != null) {
-      // Update the most recent poop entry that has abnormal color
-      for (int i = 0; i < session.poopEntries.length; i++) {
-        var entry = session.poopEntries[i];
-        if (entry.color == PoopColor.abnormal && !entry.hasPhoto) {
-          final updatedEntry = entry.copyWith(
-            photoPath: photoPath,
-            hasPhoto: true,
-          );
-          final updatedEntries = List.of(session.poopEntries);
-          updatedEntries[i] = updatedEntry;
-          final updatedSession = session.copyWith(poopEntries: updatedEntries);
-          await updateSession(updatedSession);
-          break;
+      // Find the specific entry we want to update
+      int entryIndex;
+      if (entryTime != null) {
+        entryIndex = session.poopEntries.indexWhere((e) => e.time.isAtSameMomentAs(entryTime));
+        // If not found by exact time, try finding by closest time
+        if (entryIndex == -1) {
+          entryIndex = session.poopEntries.indexWhere((e) =>
+              e.color == PoopColor.abnormal &&
+              !e.hasPhoto &&
+              e.time.difference(entryTime).inMinutes.abs() < 1);
         }
+      } else {
+        // Legacy fallback - find first abnormal entry without photo
+        entryIndex =
+            session.poopEntries.indexWhere((e) => e.color == PoopColor.abnormal && !e.hasPhoto);
+      }
+
+      if (entryIndex != -1) {
+        final entry = session.poopEntries[entryIndex];
+        final updatedEntry = entry.copyWith(
+          photoPath: photoPath,
+          hasPhoto: true,
+        );
+        final updatedEntries = List.of(session.poopEntries);
+        updatedEntries[entryIndex] = updatedEntry;
+        final updatedSession = session.copyWith(poopEntries: updatedEntries);
+        await updateSession(updatedSession);
       }
     }
   }
@@ -296,21 +309,24 @@ class SessionProvider with ChangeNotifier {
     }
   }
 
-  Future<void> removeAbnormalPoopPhoto(Session session) async {
-    // Find and update the most recent poop entry that has a photo
+  Future<void> removeAbnormalPoopPhoto(Session session, {DateTime? entryTime}) async {
+    // If entryTime is provided, find and update that specific entry
+    // Otherwise find and update the most recent poop entry that has a photo
     for (int i = 0; i < session.poopEntries.length; i++) {
       var entry = session.poopEntries[i];
       if (entry.hasPhoto && entry.photoPath != null) {
-        await _deletePhotoFile(entry.photoPath!);
-        final updatedEntry = entry.copyWith(
-          photoPath: null,
-          hasPhoto: false,
-        );
-        final updatedEntries = List.of(session.poopEntries);
-        updatedEntries[i] = updatedEntry;
-        final updatedSession = session.copyWith(poopEntries: updatedEntries);
-        await updateSession(updatedSession);
-        break;
+        if (entryTime == null || entry.time.isAtSameMomentAs(entryTime)) {
+          await _deletePhotoFile(entry.photoPath!);
+          final updatedEntry = entry.copyWith(
+            photoPath: null,
+            hasPhoto: false,
+          );
+          final updatedEntries = List.of(session.poopEntries);
+          updatedEntries[i] = updatedEntry;
+          final updatedSession = session.copyWith(poopEntries: updatedEntries);
+          await updateSession(updatedSession);
+          break;
+        }
       }
     }
   }
