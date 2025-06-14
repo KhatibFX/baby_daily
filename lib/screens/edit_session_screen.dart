@@ -17,6 +17,51 @@ class EditSessionScreen extends StatelessWidget {
 
   const EditSessionScreen({super.key, required this.originalSession});
 
+  Future<void> _cleanupDiscardedPhotos(BuildContext context, Session editingSession, Session originalSession) async {
+    final provider = context.read<SessionProvider>();
+    // Clean up session photo if changed
+    if (editingSession.hasSessionPhoto && editingSession.sessionPhotoPath != originalSession.sessionPhotoPath) {
+      await provider.deletePhotoOnly(editingSession.sessionPhotoPath!);
+    }
+    // Clean up poop photos if changed
+    for (final editedEntry in editingSession.poopEntries) {
+      if (editedEntry.hasPhoto && editedEntry.photoPath != null) {
+        // Find matching entry in original session
+        final matchingEntry = originalSession.poopEntries
+            .where((e) => e.id == editedEntry.id)
+            .firstOrNull;
+        // If no matching entry or photo path changed, delete the photo
+        if (matchingEntry?.photoPath != editedEntry.photoPath) {
+          await provider.deletePhotoOnly(editedEntry.photoPath!);
+        }
+      }
+    }
+  }
+
+  Future<void> _cleanupOldPhotos(BuildContext context, Session editingSession, Session originalSession) async {
+    final provider = context.read<SessionProvider>();
+    
+    // Clean up old session photo if changed
+    if (originalSession.hasSessionPhoto && 
+        originalSession.sessionPhotoPath != editingSession.sessionPhotoPath) {
+      await provider.deletePhotoOnly(originalSession.sessionPhotoPath!);
+    }
+
+    // Clean up old poop photos if changed
+    for (final originalEntry in originalSession.poopEntries) {
+      if (originalEntry.hasPhoto && originalEntry.photoPath != null) {
+        // Find matching entry in edited session
+        final matchingEntry = editingSession.poopEntries
+            .where((e) => e.id == originalEntry.id)
+            .firstOrNull;
+        // If entry was changed or removed and had a different photo, delete the old photo
+        if (matchingEntry?.photoPath != originalEntry.photoPath) {
+          await provider.deletePhotoOnly(originalEntry.photoPath!);
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Initialize editing session
@@ -36,7 +81,12 @@ class EditSessionScreen extends StatelessWidget {
                 message: 'Do you want to discard all changes?',
               );
               if (discard && context.mounted) {
-                context.read<EditSessionProvider>().resetSession();
+                final editProvider = context.read<EditSessionProvider>();
+                final editingSession = editProvider.editingSession;
+                if (editingSession != null) {
+                  await _cleanupDiscardedPhotos(context, editingSession, originalSession);
+                }
+                editProvider.resetSession();
                 Navigator.of(context).pop();
               }
             },
@@ -55,12 +105,15 @@ class EditSessionScreen extends StatelessWidget {
                     ? () async {
                         final sessionProvider = context.read<SessionProvider>();
                         
-                        // Update session and all entry types
+                        // First clean up old photos that were replaced
+                        await _cleanupOldPhotos(context, editingSession, originalSession);
+
+                        // Then update session and all entry types
                         await Future.wait([
-                          sessionProvider.updateSession(editingSession!),
-                          sessionProvider.updateSessionWithPeeEntries(editingSession!),
-                          sessionProvider.updateSessionWithPoopEntries(editingSession!),
-                          sessionProvider.updateSessionWithMilkEntries(editingSession!),
+                          sessionProvider.updateSession(editingSession),
+                          sessionProvider.updateSessionWithPeeEntries(editingSession),
+                          sessionProvider.updateSessionWithPoopEntries(editingSession),
+                          sessionProvider.updateSessionWithMilkEntries(editingSession),
                         ]);
 
                         if (context.mounted) {

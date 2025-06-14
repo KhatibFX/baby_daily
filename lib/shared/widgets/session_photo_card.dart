@@ -1,10 +1,10 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:provider/provider.dart';
 import 'package:path/path.dart' as path;
+import 'package:provider/provider.dart';
 
-import '../../models/poop_entry.dart';
 import '../../models/session.dart';
 import '../../providers/session_provider.dart';
 
@@ -77,6 +77,7 @@ class SessionPhotoCard extends StatelessWidget {
     if (image != null) {
       final provider = Provider.of<SessionProvider>(context, listen: false);
       if (isEditing) {
+        // In edit mode, just save the new photo without deleting the old one
         final String? newPhotoPath = await provider.savePhotoOnly(image, photoPrefix);
         if (newPhotoPath != null) {
           final updatedSession = updatePhotoInSession(session, newPhotoPath, true);
@@ -155,7 +156,7 @@ class SessionPhotoCard extends StatelessWidget {
 
     final provider = Provider.of<SessionProvider>(context, listen: false);
     if (isEditing) {
-      await provider.deletePhotoOnly(photoPath!);
+      // In edit mode, don't delete the file, just update the session state
       final updatedSession = updatePhotoInSession(session, null, false);
       onSessionChanged(updatedSession);
     } else {
