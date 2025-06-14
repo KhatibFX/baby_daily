@@ -54,7 +54,15 @@ class EditSessionScreen extends StatelessWidget {
                 onPressed: hasChanges
                     ? () async {
                         final sessionProvider = context.read<SessionProvider>();
-                        await sessionProvider.updateSession(editingSession!);
+                        
+                        // Update session and all entry types
+                        await Future.wait([
+                          sessionProvider.updateSession(editingSession!),
+                          sessionProvider.updateSessionWithPeeEntries(editingSession!),
+                          sessionProvider.updateSessionWithPoopEntries(editingSession!),
+                          sessionProvider.updateSessionWithMilkEntries(editingSession!),
+                        ]);
+
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text('Changes saved successfully')),
