@@ -4,6 +4,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:intl/intl.dart';
 import '../models/session.dart';
+import '../models/pee_entry.dart';
+import '../models/poop_entry.dart';
+import '../models/milk_entry.dart';
 
 class ExcelService {
   static Future<File> generateSessionsExcel(List<Session> sessions) async {
@@ -16,15 +19,24 @@ class ExcelService {
       'Wake Up Time',
       'Sleep Time',
       'Sleep Duration',
-      'Pee Amount',
+      'Next Session Start',
+      'Time Until Next Session',
+      'Pee Events',
+      'Pee Times',
+      'Pee Amounts',
       'Pee Remarks',
-      'Poop Amount',
-      'Poop Consistency',
-      'Poop Color',
-      'Milk Intake (ml)',
+      'Poop Events',
+      'Poop Times',
+      'Poop Amounts',
+      'Poop Consistencies',
+      'Poop Colors',
+      'Poop Photos',
+      'Milk Events',
+      'Milk Times',
+      'Milk Amounts (ml)',
+      'Total Milk (ml)',
       'Vitamin AD',
-      'Has Session Photo',
-      'Has Abnormal Poop Photo'
+      'Has Session Photo'
     ];
 
     for (var i = 0; i < headers.length; i++) {
@@ -46,6 +58,7 @@ class ExcelService {
       final dateFormat = DateFormat('MMM dd, yyyy');
       final timeFormat = DateFormat('HH:mm');
 
+      // Calculate sleep duration for current session
       final sleepDuration = session.sleepTime != null
           ? session.sleepTime!.difference(session.wakeUpTime)
           : null;
@@ -53,20 +66,81 @@ class ExcelService {
           ? '${sleepDuration.inHours}h ${sleepDuration.inMinutes % 60}m'
           : 'N/A';
 
+      // Calculate time until next session
+      final nextSession = i < sessions.length - 1 ? sessions[i + 1] : null;
+      final timeUntilNext = nextSession != null && session.sleepTime != null
+          ? nextSession.wakeUpTime.difference(session.sleepTime!)
+          : null;
+      final timeUntilNextStr = timeUntilNext != null
+          ? '${timeUntilNext.inHours}h ${timeUntilNext.inMinutes % 60}m'
+          : 'N/A';
+
+      // Process pee entries
+      final peeEvents = session.peeEntries.length.toString();
+      final peeTimes = session.peeEntries
+          .map((e) => timeFormat.format(e.time))
+          .join(', ');
+      final peeAmounts = session.peeEntries
+          .map((e) => e.amount.name)
+          .join(', ');
+      final peeRemarks = session.peeEntries
+          .map((e) => e.remarks ?? '')
+          .where((r) => r.isNotEmpty)
+          .join('; ');
+
+      // Process poop entries
+      final poopEvents = session.poopEntries.length.toString();
+      final poopTimes = session.poopEntries
+          .map((e) => timeFormat.format(e.time))
+          .join(', ');
+      final poopAmounts = session.poopEntries
+          .map((e) => e.amount.name)
+          .join(', ');
+      final poopConsistencies = session.poopEntries
+          .map((e) => e.consistency.name)
+          .join(', ');
+      final poopColors = session.poopEntries
+          .map((e) => e.color.name)
+          .join(', ');
+      final poopPhotos = session.poopEntries
+          .map((e) => e.hasPhoto ? 'Yes' : 'No')
+          .join(', ');
+
+      // Process milk entries
+      final milkEvents = session.milkEntries.length.toString();
+      final milkTimes = session.milkEntries
+          .map((e) => timeFormat.format(e.time))
+          .join(', ');
+      final milkAmounts = session.milkEntries
+          .map((e) => e.amount.toString())
+          .join(', ');
+      final totalMilk = session.milkEntries
+          .fold(0, (sum, entry) => sum + entry.amount)
+          .toString();
+
       final row = [
         dateFormat.format(session.wakeUpTime),
         timeFormat.format(session.wakeUpTime),
         session.sleepTime != null ? timeFormat.format(session.sleepTime!) : 'Not set',
         sleepDurationStr,
-        session.pee.name,
-        session.peeRemarks ?? '',
-        session.poopAmount.name,
-        session.poopConsistency.name,
-        session.poopColor.name,
-        session.milkIntake.toString(),
+        nextSession != null ? timeFormat.format(nextSession.wakeUpTime) : 'N/A',
+        timeUntilNextStr,
+        peeEvents,
+        peeTimes,
+        peeAmounts,
+        peeRemarks,
+        poopEvents,
+        poopTimes,
+        poopAmounts,
+        poopConsistencies,
+        poopColors,
+        poopPhotos,
+        milkEvents,
+        milkTimes,
+        milkAmounts,
+        totalMilk,
         session.vitaminAD ? 'Yes' : 'No',
         session.hasSessionPhoto ? 'Yes' : 'No',
-        session.hasAbnormalPoopPhoto ? 'Yes' : 'No',
       ];
 
       for (var j = 0; j < row.length; j++) {

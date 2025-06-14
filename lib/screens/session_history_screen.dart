@@ -1,11 +1,13 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+
 import '../models/session.dart';
 import '../providers/session_provider.dart';
 import '../services/excel_service.dart';
-import 'package:intl/intl.dart';
-import 'dart:io';
 import 'edit_session_screen.dart';
 
 class SessionHistoryScreen extends StatelessWidget {
@@ -32,52 +34,62 @@ class SessionHistoryScreen extends StatelessWidget {
       builder: (context, sessionProvider, child) {
         final closedSessions = sessionProvider.sessions.where((s) => s.isClosed).toList();
         return Scaffold(
-          body: ListView.builder(
-            itemCount: closedSessions.length * 2 - 1, // Double for separators, minus 1 for last item
-            itemBuilder: (context, index) {
-              // If index is even, it's a session card
-              if (index % 2 == 0) {
-                final sessionIndex = index ~/ 2;
-                final session = closedSessions[sessionIndex];
-                return _buildSessionCard(context, session, sessionProvider);
-              } 
-              // If index is odd, it's a separator with sleep duration
-              else {
-                final newerSession = closedSessions[index ~/ 2]; // Index of the session above
-                final olderSession = closedSessions[(index ~/ 2) + 1]; // Index of the session below
-                if (olderSession.sleepTime != null) {
-                  final sleepDuration = newerSession.wakeUpTime.difference(olderSession.sleepTime!);
-                  return Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 32),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 2,
-                          height: 40,
-                          color: Theme.of(context).primaryColor.withOpacity(0.5),
-                        ),
-                        SizedBox(width: 8),
-                        Icon(
-                          Icons.bedtime,
-                          size: 16,
-                          color: Theme.of(context).primaryColor.withOpacity(0.7),
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          '${sleepDuration.inHours}h ${sleepDuration.inMinutes % 60}m of sleep',
-                          style: TextStyle(
-                            color: Theme.of(context).primaryColor,
-                            fontStyle: FontStyle.italic,
+          body: closedSessions.isNotEmpty
+              ? ListView.builder(
+                  itemCount: closedSessions.length * 2 - 1,
+                  // Double for separators, minus 1 for last item
+                  itemBuilder: (context, index) {
+                    // If index is even, it's a session card
+                    if (index % 2 == 0) {
+                      final sessionIndex = index ~/ 2;
+                      final session = closedSessions[sessionIndex];
+                      return _buildSessionCard(context, session, sessionProvider);
+                    }
+                    // If index is odd, it's a separator with sleep duration
+                    else {
+                      final newerSession = closedSessions[index ~/ 2]; // Index of the session above
+                      final olderSession =
+                          closedSessions[(index ~/ 2) + 1]; // Index of the session below
+                      if (olderSession.sleepTime != null) {
+                        final sleepDuration =
+                            newerSession.wakeUpTime.difference(olderSession.sleepTime!);
+                        return Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 32),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 2,
+                                height: 40,
+                                color: Theme.of(context).primaryColor.withOpacity(0.5),
+                              ),
+                              SizedBox(width: 8),
+                              Icon(
+                                Icons.bedtime,
+                                size: 16,
+                                color: Theme.of(context).primaryColor.withOpacity(0.7),
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                '${sleepDuration.inHours}h ${sleepDuration.inMinutes % 60}m of sleep',
+                                style: TextStyle(
+                                  color: Theme.of(context).primaryColor,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-                return SizedBox(height: 4); // Small gap if no sleep data
-              }
-            },
-          ),
+                        );
+                      }
+                      return SizedBox(height: 4); // Small gap if no sleep data
+                    }
+                  },
+                )
+              : Center(
+                  child: Text(
+                    'No closed sessions found',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
           floatingActionButton: FloatingActionButton(
             onPressed: () => _exportToExcel(context, closedSessions),
             child: Icon(Icons.share),
@@ -88,12 +100,9 @@ class SessionHistoryScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSessionCard(
-    BuildContext context,
-    Session session,
-    SessionProvider provider,
-  ) {
+  Widget _buildSessionCard(BuildContext context, Session session, SessionProvider provider) {
     final sleepDuration = session.sleepTime?.difference(session.wakeUpTime);
+    final timeFormat = DateFormat('HH:mm');
 
     return Card(
       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -105,17 +114,10 @@ class SessionHistoryScreen extends StatelessWidget {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Wake up: ${DateFormat('HH:mm').format(session.wakeUpTime)}',
-            ),
-            if (session.sleepTime != null)
-              Text(
-                'Sleep: ${DateFormat('HH:mm').format(session.sleepTime!)}',
-              ),
+            Text('Wake up: ${timeFormat.format(session.wakeUpTime)}'),
+            if (session.sleepTime != null) Text('Sleep: ${timeFormat.format(session.sleepTime!)}'),
             if (sleepDuration != null)
-              Text(
-                'Duration: ${sleepDuration.inHours}h ${sleepDuration.inMinutes % 60}m',
-              ),
+              Text('Duration: ${sleepDuration.inHours}h ${sleepDuration.inMinutes % 60}m'),
           ],
         ),
         children: [
@@ -124,19 +126,62 @@ class SessionHistoryScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildDetailRow('Pee', session.pee.name),
-                if (session.peeRemarks?.isNotEmpty == true)
-                  _buildDetailRow('Pee Remarks', session.peeRemarks!),
-                _buildDetailRow('Poop Amount', session.poopAmount.name),
-                _buildDetailRow('Poop Consistency', session.poopConsistency.name),
-                _buildDetailRow('Poop Color', session.poopColor.name),
-                _buildDetailRow('Milk Intake', '${session.milkIntake} ml'),
+                // Pee entries section
+                Text('Pee Events:', style: Theme.of(context).textTheme.titleSmall),
+                ...session.peeEntries.map((entry) => Padding(
+                      padding: EdgeInsets.only(left: 16, top: 4),
+                      child: Row(
+                        children: [
+                          Text('${timeFormat.format(entry.time)} - ${entry.amount.name}'),
+                          if (entry.remarks?.isNotEmpty == true) ...[
+                            SizedBox(width: 8),
+                            Text('(${entry.remarks!})',
+                                style: TextStyle(fontStyle: FontStyle.italic)),
+                          ],
+                        ],
+                      ),
+                    )),
+                SizedBox(height: 8),
+
+                // Poop entries section
+                Text('Poop Events:', style: Theme.of(context).textTheme.titleSmall),
+                ...session.poopEntries.map((entry) => Padding(
+                      padding: EdgeInsets.only(left: 16, top: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text('${timeFormat.format(entry.time)} - ${entry.amount.name}'),
+                              SizedBox(width: 8),
+                              Text('(${entry.consistency.name}, ${entry.color.name})'),
+                            ],
+                          ),
+                          if (entry.hasPhoto && entry.photoPath != null)
+                            Padding(
+                              padding: EdgeInsets.only(top: 4),
+                              child: _buildPhotoSection(context, entry.photoPath, ''),
+                            ),
+                        ],
+                      ),
+                    )),
+                SizedBox(height: 8),
+
+                // Milk entries section
+                Text('Milk Events:', style: Theme.of(context).textTheme.titleSmall),
+                ...session.milkEntries.map((entry) => Padding(
+                      padding: EdgeInsets.only(left: 16, top: 4),
+                      child: Text('${timeFormat.format(entry.time)} - ${entry.amount}ml'),
+                    )),
+                SizedBox(height: 16),
+
+                // Other session details
                 _buildDetailRow('Vitamin AD', session.vitaminAD ? 'Yes' : 'No'),
                 if (session.hasSessionPhoto)
                   _buildPhotoSection(context, session.sessionPhotoPath, ''),
-                if (session.poopColor == PoopColor.abnormal && session.hasAbnormalPoopPhoto)
-                  _buildPhotoSection(context, session.abnormalPoopPhotoPath, 'Abnormal Poop Photo'),
                 SizedBox(height: 16),
+
+                // Actions
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
@@ -156,7 +201,8 @@ class SessionHistoryScreen extends StatelessWidget {
                           context: context,
                           builder: (context) => AlertDialog(
                             title: Text('Delete Session'),
-                            content: Text('Are you sure you want to delete this session? This action cannot be undone.'),
+                            content: Text(
+                                'Are you sure you want to delete this session? This action cannot be undone.'),
                             actions: [
                               TextButton(
                                 onPressed: () => Navigator.of(context).pop(false),
@@ -170,7 +216,7 @@ class SessionHistoryScreen extends StatelessWidget {
                             ],
                           ),
                         );
-                        
+
                         if (confirm == true) {
                           await provider.deleteSession(session);
                           if (context.mounted) {
@@ -218,7 +264,7 @@ class SessionHistoryScreen extends StatelessWidget {
     String title,
   ) {
     if (photoPath == null) return SizedBox.shrink();
-    
+
     return FutureBuilder<bool>(
       future: File(photoPath).exists(),
       builder: (context, snapshot) {
