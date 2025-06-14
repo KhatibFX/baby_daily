@@ -18,7 +18,7 @@ class ExcelService {
       'Date',
       'Wake Up Time',
       'Sleep Time',
-      'Sleep Duration',
+      'Session Duration',
       'Next Session Start',
       'Time Until Next Session',
       'Pee Events',
@@ -58,12 +58,12 @@ class ExcelService {
       final dateFormat = DateFormat('MMM dd, yyyy');
       final timeFormat = DateFormat('HH:mm');
 
-      // Calculate sleep duration for current session
-      final sleepDuration = session.sleepTime != null
+      // Calculate session duration (wake up to sleep time)
+      final sessionDuration = session.sleepTime != null
           ? session.sleepTime!.difference(session.wakeUpTime)
           : null;
-      final sleepDurationStr = sleepDuration != null
-          ? '${sleepDuration.inHours}h ${sleepDuration.inMinutes % 60}m'
+      final sessionDurationStr = sessionDuration != null
+          ? '${sessionDuration.inHours}h ${sessionDuration.inMinutes % 60}m'
           : 'N/A';
 
       // Calculate time until next session
@@ -122,7 +122,7 @@ class ExcelService {
         dateFormat.format(session.wakeUpTime),
         timeFormat.format(session.wakeUpTime),
         session.sleepTime != null ? timeFormat.format(session.sleepTime!) : 'Not set',
-        sleepDurationStr,
+        sessionDurationStr,
         nextSession != null ? timeFormat.format(nextSession.wakeUpTime) : 'N/A',
         timeUntilNextStr,
         peeEvents,
