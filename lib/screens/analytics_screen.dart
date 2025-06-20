@@ -28,21 +28,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   void _initializeDates() {
     // Calculate the last 7:20 AM that occurred
-    _startDate = DateTime.now().hour >= 7 && DateTime.now().minute >= 20
-        ? DateTime(
-            DateTime.now().year,
-            DateTime.now().month,
-            DateTime.now().day,
-            7,
-            20,
-          )
-        : DateTime(
-            DateTime.now().year,
-            DateTime.now().month,
-            DateTime.now().day - 1,
-            7,
-            20,
-          );
+    final now = DateTime.now();
+    final today720AM = DateTime(now.year, now.month, now.day, 7, 20);
+    
+    _startDate = now.isAfter(today720AM)
+        ? today720AM
+        : today720AM.subtract(Duration(days: 1));
 
     // End time is always 24 hours after start time
     _endDate = _startDate.add(Duration(days: 1));
