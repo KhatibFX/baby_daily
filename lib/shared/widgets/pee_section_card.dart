@@ -52,7 +52,8 @@ class PeeSectionCard extends StatelessWidget {
                 items: session.peeEntries.asMap().entries.map((entry) {
                   return ExpandableEntryListItem(
                     data: entry,
-                    summaryText: (data) => '${data.value.amount.name} at ${_formatTime(data.value.time)}${data.value.remarks?.isNotEmpty == true ? ' - ${data.value.remarks}' : ''}',
+                    summaryText: (data) =>
+                        '${data.value.amount.name} at ${_formatTime(data.value.time)}${data.value.remarks?.isNotEmpty == true ? ' - ${data.value.remarks}' : ''}',
                     builder: (data, isExpanded) => _PeeEntryItem(
                       entry: data.value,
                       session: session,
@@ -66,24 +67,18 @@ class PeeSectionCard extends StatelessWidget {
                         } else {
                           final updatedEntries = List.of(session.peeEntries);
                           updatedEntries[data.key] = updatedEntry;
-                          onSessionChanged(
-                              session.copyWith(peeEntries: updatedEntries));
+                          onSessionChanged(session.copyWith(peeEntries: updatedEntries));
                         }
                       },
-                      onDelete: data.key > 0
-                          ? () async {
-                              if (!session.isClosed && data.value.id != null) {
-                                final provider = context.read<SessionProvider>();
-                                await provider.deletePeeEntry(
-                                    data.value.id!, session.id!);
-                              } else {
-                                final updatedEntries = List.of(session.peeEntries)
-                                  ..removeAt(data.key);
-                                onSessionChanged(
-                                    session.copyWith(peeEntries: updatedEntries));
-                              }
-                            }
-                          : null,
+                      onDelete: () async {
+                        if (!session.isClosed && data.value.id != null) {
+                          final provider = context.read<SessionProvider>();
+                          await provider.deletePeeEntry(data.value.id!, session.id!);
+                        } else {
+                          final updatedEntries = List.of(session.peeEntries)..removeAt(data.key);
+                          onSessionChanged(session.copyWith(peeEntries: updatedEntries));
+                        }
+                      },
                     ),
                   );
                 }).toList(),
@@ -127,14 +122,14 @@ class _PeeEntryItem extends StatefulWidget {
   final PeeEntry entry;
   final Session session;
   final Function(PeeEntry) onUpdate;
-  final VoidCallback? onDelete;
+  final VoidCallback onDelete;
 
   const _PeeEntryItem({
     Key? key,
     required this.entry,
     required this.session,
     required this.onUpdate,
-    this.onDelete,
+    required this.onDelete,
   }) : super(key: key);
 
   @override
@@ -190,14 +185,13 @@ class _PeeEntryItemState extends State<_PeeEntryItem> {
                 }).toList(),
               ),
             ),
-            if (widget.onDelete != null)
-              IconButton(
-                icon: Icon(Icons.delete),
-                onPressed: () {
-                  FocusScope.of(context).unfocus();
-                  widget.onDelete!();
-                },
-              ),
+            IconButton(
+              icon: Icon(Icons.delete),
+              onPressed: () {
+                FocusScope.of(context).unfocus();
+                widget.onDelete();
+              },
+            ),
           ],
         ),
         if (widget.entry.amount != PeeAmount.na) ...[

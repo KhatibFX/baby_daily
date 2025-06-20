@@ -74,22 +74,19 @@ class PoopSectionCard extends StatelessWidget {
                           onSessionChanged(session.copyWith(poopEntries: updatedEntries));
                         }
                       },
-                      onDelete: data.key > 0
-                          ? () async {
-                              if (!session.isClosed && data.value.id != null) {
-                                final provider = context.read<SessionProvider>();
-                                await provider.deletePoopEntry(
-                                  data.value.id!,
-                                  session.id!,
-                                  photoPath: data.value.photoPath,
-                                );
-                              } else {
-                                final updatedEntries = List.of(session.poopEntries)
-                                  ..removeAt(data.key);
-                                onSessionChanged(session.copyWith(poopEntries: updatedEntries));
-                              }
-                            }
-                          : null,
+                      onDelete: () async {
+                        if (!session.isClosed && data.value.id != null) {
+                          final provider = context.read<SessionProvider>();
+                          await provider.deletePoopEntry(
+                            data.value.id!,
+                            session.id!,
+                            photoPath: data.value.photoPath,
+                          );
+                        } else {
+                          final updatedEntries = List.of(session.poopEntries)..removeAt(data.key);
+                          onSessionChanged(session.copyWith(poopEntries: updatedEntries));
+                        }
+                      },
                     ),
                   );
                 }).toList(),
@@ -138,7 +135,7 @@ class _PoopEntryItem extends StatelessWidget {
   final Session session;
   final bool isEditing;
   final Function(PoopEntry) onUpdate;
-  final VoidCallback? onDelete;
+  final VoidCallback onDelete;
 
   const _PoopEntryItem({
     Key? key,
@@ -146,7 +143,7 @@ class _PoopEntryItem extends StatelessWidget {
     required this.session,
     required this.isEditing,
     required this.onUpdate,
-    this.onDelete,
+    required this.onDelete,
   }) : super(key: key);
 
   @override
@@ -187,14 +184,13 @@ class _PoopEntryItem extends StatelessWidget {
                 ],
               ),
             ),
-            if (onDelete != null)
-              IconButton(
-                icon: Icon(Icons.delete),
-                onPressed: () {
-                  FocusScope.of(context).unfocus();
-                  onDelete!();
-                },
-              ),
+            IconButton(
+              icon: Icon(Icons.delete),
+              onPressed: () {
+                FocusScope.of(context).unfocus();
+                onDelete();
+              },
+            ),
           ],
         ),
         if (entry.amount != PoopAmount.na) ...[
@@ -260,8 +256,8 @@ class _PoopEntryItem extends StatelessWidget {
       session: session,
       onSessionChanged: (updatedSession) {
         // Find this entry in the updated session's poop entries and call onUpdate with it
-        final updatedEntry = updatedSession.poopEntries
-            .firstWhere((e) => e.id == entry.id || e.time == entry.time);
+        final updatedEntry =
+            updatedSession.poopEntries.firstWhere((e) => e.id == entry.id || e.time == entry.time);
         onUpdate(updatedEntry);
       },
       title: 'Abnormal Poop Photo',
@@ -272,9 +268,8 @@ class _PoopEntryItem extends StatelessWidget {
       updatePhotoInSession: (session, photoPath, hasPhoto) {
         // Create a copy of the session with the updated poop entry
         final updatedEntry = entry.copyWith(photoPath: photoPath, hasPhoto: hasPhoto);
-        final entryIndex = session.poopEntries.indexWhere(
-          (e) => e.id == entry.id || e.time == entry.time
-        );
+        final entryIndex =
+            session.poopEntries.indexWhere((e) => e.id == entry.id || e.time == entry.time);
         final updatedEntries = List.of(session.poopEntries);
         updatedEntries[entryIndex] = updatedEntry;
         return session.copyWith(poopEntries: updatedEntries);

@@ -112,4 +112,42 @@ class Session {
       isClosed: isClosed ?? this.isClosed,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'wakeUpTime': wakeUpTime.toIso8601String(),
+      'peeEntries': peeEntries.map((e) => e.toJson()).toList(),
+      'poopEntries': poopEntries.map((e) => e.toJson()).toList(),
+      'milkEntries': milkEntries.map((e) => e.toJson()).toList(),
+      'vitaminAD': vitaminAD,
+      'sleepTime': sleepTime?.toIso8601String(),
+      'sessionPhotoPath': sessionPhotoPath,
+      'hasSessionPhoto': hasSessionPhoto,
+      'isClosed': isClosed,
+    };
+  }
+
+  factory Session.fromJson(Map<String, dynamic> json) {
+    return Session(
+      id: json['id'] as int?,
+      wakeUpTime: DateTime.parse(json['wakeUpTime'] as String),
+      peeEntries: (json['peeEntries'] as List)
+          .map((e) => PeeEntry.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      poopEntries: (json['poopEntries'] as List)
+          .map((e) => PoopEntry.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      milkEntries: (json['milkEntries'] as List)
+          .map((e) => MilkEntry.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      vitaminAD: json['vitaminAD'] as bool,
+      sleepTime: json['sleepTime'] != null
+          ? DateTime.parse(json['sleepTime'] as String)
+          : null,
+      sessionPhotoPath: json['sessionPhotoPath'] as String?,
+      hasSessionPhoto: json['hasSessionPhoto'] as bool,
+      isClosed: json['isClosed'] as bool,
+    );
+  }
 }

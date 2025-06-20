@@ -197,6 +197,31 @@ class SessionProvider with ChangeNotifier {
     }
   }
 
+  Future<List<Session>> getAllSessions() async {
+    return await _db.getAllSessions();
+  }
+
+  Future<void> restoreFromBackup(List<Session> sessions) async {
+    // Clear existing sessions from database
+    await _db.clearAllSessions();
+
+    // Delete existing photos
+    final photosDir = Directory(await _photoDirectory);
+    if (await photosDir.exists()) {
+      await photosDir.delete(recursive: true);
+      await photosDir.create(recursive: true);
+    }
+
+    // Insert all sessions from backup
+    for (final session in sessions) {
+      await _db.restoreSession(session);
+    }
+
+    // Reload sessions
+    await loadSessions();
+    notifyListeners();
+  }
+
   Future<List<Session>> getClosedSessionsInRange(DateTime start, DateTime end) async {
     final sessions = await _db.getSessionsInRange(start, end);
     return sessions.where((s) => s.isClosed).toList();

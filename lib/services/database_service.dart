@@ -391,7 +391,65 @@ class DatabaseService {
     });
   }
 
-  // Helper method to load all entries for a session
+  /// Clears all data from the database
+  Future<void> clearAllSessions() async {
+    final db = await instance.database;
+    await db.transaction((txn) async {
+      // Delete all entries from all tables
+      await txn.delete('milk_entries');
+      await txn.delete('poop_entries');
+      await txn.delete('pee_entries');
+      await txn.delete('sessions');
+    });
+  }
+
+  Future<void> restoreSession(Session session) async {
+    final db = await instance.database;
+    await db.transaction((txn) async {
+      // Insert session
+      final sessionId = await txn.insert('sessions', {
+        'wakeUpTime': session.wakeUpTime.toIso8601String(),
+        'vitaminAD': session.vitaminAD ? 1 : 0,
+        'sleepTime': session.sleepTime?.toIso8601String(),
+        'sessionPhotoPath': session.sessionPhotoPath,
+        'hasSessionPhoto': session.hasSessionPhoto ? 1 : 0,
+        'isClosed': session.isClosed ? 1 : 0,
+      });
+
+      // Insert pee entries
+      for (final entry in session.peeEntries) {
+        await txn.insert('pee_entries', {
+          'session_id': sessionId,
+          'amount': entry.amount.index,
+          'remarks': entry.remarks,
+          'time': entry.time.toIso8601String(),
+        });
+      }
+
+      // Insert poop entries
+      for (final entry in session.poopEntries) {
+        await txn.insert('poop_entries', {
+          'session_id': sessionId,
+          'amount': entry.amount.index,
+          'consistency': entry.consistency.index,
+          'color': entry.color.index,
+          'time': entry.time.toIso8601String(),
+          'photo_path': entry.photoPath,
+          'has_photo': entry.hasPhoto ? 1 : 0,
+        });
+      }
+
+      // Insert milk entries
+      for (final entry in session.milkEntries) {
+        await txn.insert('milk_entries', {
+          'session_id': sessionId,
+          'amount': entry.amount,
+          'time': entry.time.toIso8601String(),
+        });
+      }
+    });
+  }
+
   Future<Session> loadSessionWithEntries(Session session) async {
     if (session.id == null) return session;
 

@@ -36,6 +36,10 @@ class PeeEntry {
     );
   }
 
+  Map<String, dynamic> toJson() => toMap();
+
+  factory PeeEntry.fromJson(Map<String, dynamic> json) => PeeEntry.fromMap(json);
+
   PeeEntry copyWith({
     int? id,
     int? sessionId,

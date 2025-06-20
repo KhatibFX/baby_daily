@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'providers/session_provider.dart';
 import 'providers/edit_session_provider.dart';
-import 'screens/session_screen.dart';
-import 'screens/session_history_screen.dart';
+import 'providers/session_provider.dart';
 import 'screens/analytics_screen.dart';
+import 'screens/session_history_screen.dart';
+import 'screens/session_screen.dart';
+import 'screens/settings_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -56,16 +57,18 @@ class _MyHomePageState extends State<MyHomePage> {
     SessionScreen(),
     SessionHistoryScreen(),
     AnalyticsScreen(),
+    SettingsScreen(),
   ];
 
   final List<String> _titles = [
     'Current Session',
     'Session History',
     'Analytics',
+    'Settings',
   ];
 
   @override
-  void initState() {
+  initState() {
     super.initState();
     // Load initial sessions
     Provider.of<SessionProvider>(context, listen: false).loadSessions();
@@ -86,6 +89,10 @@ class _MyHomePageState extends State<MyHomePage> {
             _currentIndex = index;
           });
         },
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        selectedItemColor: Theme.of(context).colorScheme.primary,
+        unselectedItemColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
         items: [
           BottomNavigationBarItem(
             icon: Icon(Icons.baby_changing_station),
@@ -98,6 +105,10 @@ class _MyHomePageState extends State<MyHomePage> {
           BottomNavigationBarItem(
             icon: Icon(Icons.analytics),
             label: 'Analytics',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings),
+            label: 'Settings',
           ),
         ],
       ),

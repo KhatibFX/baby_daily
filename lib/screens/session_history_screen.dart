@@ -1,34 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:path/path.dart' as path;
-
-import '../shared/widgets/photo_view.dart';
+import 'package:provider/provider.dart';
 
 import '../models/session.dart';
 import '../providers/session_provider.dart';
-import '../services/excel_service.dart';
+import '../shared/widgets/photo_view.dart';
 import 'edit_session_screen.dart';
 
 class SessionHistoryScreen extends StatelessWidget {
-  Future<void> _exportToExcel(BuildContext context, List<Session> sessions) async {
-    try {
-      final file = await ExcelService.generateSessionsExcel(sessions);
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        subject: 'Baby Daily Sessions',
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to export sessions: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Consumer<SessionProvider>(
@@ -91,11 +71,6 @@ class SessionHistoryScreen extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
-          floatingActionButton: FloatingActionButton(
-            onPressed: () => _exportToExcel(context, closedSessions),
-            child: Icon(Icons.share),
-            tooltip: 'Export to Excel',
-          ),
         );
       },
     );
@@ -273,7 +248,7 @@ class SessionHistoryScreen extends StatelessWidget {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
-          
+
           final fullPath = path.join(snapshot.data!, photoPath);
           return PhotoView(
             photoPath: fullPath,

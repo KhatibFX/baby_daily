@@ -42,4 +42,8 @@ class MilkEntry {
       time: time ?? this.time,
     );
   }
+
+  Map<String, dynamic> toJson() => toMap();
+
+  factory MilkEntry.fromJson(Map<String, dynamic> json) => MilkEntry.fromMap(json);
 }

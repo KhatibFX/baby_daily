@@ -1,15 +1,14 @@
 import 'dart:io';
+
 import 'package:excel/excel.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as path;
 import 'package:intl/intl.dart';
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
+
 import '../models/session.dart';
-import '../models/pee_entry.dart';
-import '../models/poop_entry.dart';
-import '../models/milk_entry.dart';
 
 class ExcelService {
-  static Future<File> generateSessionsExcel(List<Session> sessions) async {
+  static Future<String> exportToExcel(List<Session> sessions) async {
     final excel = Excel.createExcel();
     final sheet = excel['Sessions'];
 
@@ -59,9 +58,8 @@ class ExcelService {
       final timeFormat = DateFormat('HH:mm');
 
       // Calculate session duration (wake up to sleep time)
-      final sessionDuration = session.sleepTime != null
-          ? session.sleepTime!.difference(session.wakeUpTime)
-          : null;
+      final sessionDuration =
+          session.sleepTime != null ? session.sleepTime!.difference(session.wakeUpTime) : null;
       final sessionDurationStr = sessionDuration != null
           ? '${sessionDuration.inHours}h ${sessionDuration.inMinutes % 60}m'
           : 'N/A';
@@ -77,46 +75,24 @@ class ExcelService {
 
       // Process pee entries
       final peeEvents = session.peeEntries.length.toString();
-      final peeTimes = session.peeEntries
-          .map((e) => timeFormat.format(e.time))
-          .join(', ');
-      final peeAmounts = session.peeEntries
-          .map((e) => e.amount.name)
-          .join(', ');
-      final peeRemarks = session.peeEntries
-          .map((e) => e.remarks ?? '')
-          .where((r) => r.isNotEmpty)
-          .join('; ');
+      final peeTimes = session.peeEntries.map((e) => timeFormat.format(e.time)).join(', ');
+      final peeAmounts = session.peeEntries.map((e) => e.amount.name).join(', ');
+      final peeRemarks =
+          session.peeEntries.map((e) => e.remarks ?? '').where((r) => r.isNotEmpty).join('; ');
 
       // Process poop entries
       final poopEvents = session.poopEntries.length.toString();
-      final poopTimes = session.poopEntries
-          .map((e) => timeFormat.format(e.time))
-          .join(', ');
-      final poopAmounts = session.poopEntries
-          .map((e) => e.amount.name)
-          .join(', ');
-      final poopConsistencies = session.poopEntries
-          .map((e) => e.consistency.name)
-          .join(', ');
-      final poopColors = session.poopEntries
-          .map((e) => e.color.name)
-          .join(', ');
-      final poopPhotos = session.poopEntries
-          .map((e) => e.hasPhoto ? 'Yes' : 'No')
-          .join(', ');
+      final poopTimes = session.poopEntries.map((e) => timeFormat.format(e.time)).join(', ');
+      final poopAmounts = session.poopEntries.map((e) => e.amount.name).join(', ');
+      final poopConsistencies = session.poopEntries.map((e) => e.consistency.name).join(', ');
+      final poopColors = session.poopEntries.map((e) => e.color.name).join(', ');
+      final poopPhotos = session.poopEntries.map((e) => e.hasPhoto ? 'Yes' : 'No').join(', ');
 
       // Process milk entries
       final milkEvents = session.milkEntries.length.toString();
-      final milkTimes = session.milkEntries
-          .map((e) => timeFormat.format(e.time))
-          .join(', ');
-      final milkAmounts = session.milkEntries
-          .map((e) => e.amount.toString())
-          .join(', ');
-      final totalMilk = session.milkEntries
-          .fold(0, (sum, entry) => sum + entry.amount)
-          .toString();
+      final milkTimes = session.milkEntries.map((e) => timeFormat.format(e.time)).join(', ');
+      final milkAmounts = session.milkEntries.map((e) => e.amount.toString()).join(', ');
+      final totalMilk = session.milkEntries.fold(0, (sum, entry) => sum + entry.amount).toString();
 
       final row = [
         dateFormat.format(session.wakeUpTime),
@@ -156,10 +132,9 @@ class ExcelService {
     for (var i = 0; i < headers.length; i++) {
       var maxLength = headers[i].length;
       for (var j = 1; j <= sessions.length; j++) {
-        final cellValue = sheet
-            .cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: j))
-            .value
-            ?.toString() ?? '';
+        final cellValue =
+            sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: j)).value?.toString() ??
+                '';
         maxLength = maxLength > cellValue.length ? maxLength : cellValue.length;
       }
       sheet.setColumnWidth(i, maxLength + 2); // Add padding
@@ -167,11 +142,12 @@ class ExcelService {
 
     // Save file
     final directory = await getTemporaryDirectory();
-    final fileName = 'baby_daily_sessions_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.xlsx';
+    final fileName =
+        'baby_daily_sessions_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.xlsx';
     final filePath = path.join(directory.path, fileName);
     final file = File(filePath);
     await file.writeAsBytes(excel.encode()!);
-    
-    return file;
+
+    return file.path;
   }
 }

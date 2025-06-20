@@ -75,24 +75,18 @@ class MilkSectionCard extends StatelessWidget {
                         } else {
                           final updatedEntries = List.of(session.milkEntries);
                           updatedEntries[data.key] = updatedEntry;
-                          onSessionChanged(
-                              session.copyWith(milkEntries: updatedEntries));
+                          onSessionChanged(session.copyWith(milkEntries: updatedEntries));
                         }
                       },
-                      onDelete: data.key > 0
-                          ? () async {
-                              if (!session.isClosed && data.value.id != null) {
-                                final provider = context.read<SessionProvider>();
-                                await provider.deleteMilkEntry(
-                                    data.value.id!, session.id!);
-                              } else {
-                                final updatedEntries = List.of(session.milkEntries)
-                                  ..removeAt(data.key);
-                                onSessionChanged(
-                                    session.copyWith(milkEntries: updatedEntries));
-                              }
-                            }
-                          : null,
+                      onDelete: () async {
+                        if (!session.isClosed && data.value.id != null) {
+                          final provider = context.read<SessionProvider>();
+                          await provider.deleteMilkEntry(data.value.id!, session.id!);
+                        } else {
+                          final updatedEntries = List.of(session.milkEntries)..removeAt(data.key);
+                          onSessionChanged(session.copyWith(milkEntries: updatedEntries));
+                        }
+                      },
                     ),
                   );
                 }).toList(),
@@ -137,14 +131,14 @@ class _MilkEntryItem extends StatefulWidget {
   final MilkEntry entry;
   final Session session;
   final Function(MilkEntry) onUpdate;
-  final VoidCallback? onDelete;
+  final VoidCallback onDelete;
 
   const _MilkEntryItem({
     Key? key,
     required this.entry,
     required this.session,
     required this.onUpdate,
-    this.onDelete,
+    required this.onDelete,
   }) : super(key: key);
 
   @override
@@ -196,16 +190,14 @@ class _MilkEntryItemState extends State<_MilkEntryItem> {
                 },
               ),
             ),
-            if (widget.onDelete != null) ...[
-              SizedBox(width: 8),
-              IconButton(
-                icon: Icon(Icons.delete),
-                onPressed: () {
-                  FocusScope.of(context).unfocus();
-                  widget.onDelete!();
-                },
-              ),
-            ],
+            SizedBox(width: 8),
+            IconButton(
+              icon: Icon(Icons.delete),
+              onPressed: () {
+                FocusScope.of(context).unfocus();
+                widget.onDelete();
+              },
+            ),
           ],
         ),
         SizedBox(height: 8),

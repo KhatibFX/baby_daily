@@ -48,6 +48,10 @@ class PoopEntry {
     );
   }
 
+  Map<String, dynamic> toJson() => toMap();
+
+  factory PoopEntry.fromJson(Map<String, dynamic> json) => PoopEntry.fromMap(json);
+
   PoopEntry copyWith({
     int? id,
     int? sessionId,
