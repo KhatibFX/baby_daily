@@ -259,12 +259,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
-  String _formatDuration(Duration d) {
-    final hours = d.inHours;
-    final minutes = d.inMinutes % 60;
-    return '${hours}h ${minutes}m';
-  }
-
   void _showSleepDetails(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -280,9 +274,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             final nextSession = _sessions[i - 1];
 
             if (currentSession.sleepTime != null) {
-              final sessionDuration = currentSession.sleepTime!.difference(currentSession.wakeUpTime);
+              final sessionDuration =
+                  currentSession.sleepTime!.difference(currentSession.wakeUpTime);
               final sleepDuration = nextSession.wakeUpTime.difference(currentSession.sleepTime!);
-              
+
               sleepPeriods.add({
                 'sleepTime': currentSession.sleepTime!,
                 'currentWakeUpTime': currentSession.wakeUpTime,
@@ -296,7 +291,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           final newestSession = _sessions.first;
           if (newestSession.sleepTime != null) {
             final sessionDuration = newestSession.sleepTime!.difference(newestSession.wakeUpTime);
-            
+
             sleepPeriods.add({
               'sleepTime': newestSession.sleepTime!,
               'currentWakeUpTime': newestSession.wakeUpTime,
@@ -407,8 +402,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                           Text(
                                             '${sessionDuration.inHours}h ${sessionDuration.inMinutes % 60}m',
                                             style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                                              color: Theme.of(context).colorScheme.primary,
-                                            ),
+                                                  color: Theme.of(context).colorScheme.primary,
+                                                ),
                                           ),
                                         ],
                                       ),
@@ -602,10 +597,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   String _getMostActiveTimes() {
     if (_sessions.isEmpty) return 'N/A';
-    
+
     // Group events by hour
     final hourCounts = <int, int>{};
-    
+
     // Collect all event times
     for (final session in _sessions) {
       for (final entry in [
@@ -621,8 +616,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     if (hourCounts.isEmpty) return 'N/A';
 
     // Sort hours by number of events
-    final sortedHours = hourCounts.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
+    final sortedHours = hourCounts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
     // For short date ranges (1 day or less), show only top 3 hours
     if (_endDate.difference(_startDate).inHours <= 24) {
@@ -632,7 +626,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           .take(3)
           .map((e) => '${e.key.toString().padLeft(2, '0')}:00')
           .join(', ');
-      
+
       return topHours.isEmpty ? 'N/A' : topHours;
     }
 
