@@ -272,7 +272,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       builder: (context) {
         List<Map<String, dynamic>> sleepPeriods = [];
 
-        // Calculate sleep periods between sessions, iterating backwards to get oldest to newest
+        // Add all sessions that have sleep duration after them
         for (int i = _sessions.length - 2; i >= 0; i--) {
           final newerSession = _sessions[i];
           final olderSession = _sessions[i + 1];
@@ -286,6 +286,20 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               'nextWakeUpTime': newerSession.wakeUpTime,
               'sleepDuration': sleepDuration,
               'currentWakeUpTime': olderSession.wakeUpTime,
+              'sessionDuration': sessionDuration,
+            });
+          }
+        }
+
+        // Add the last session if it exists
+        if (_sessions.isNotEmpty) {
+          final lastSession = _sessions.last;
+          if (lastSession.sleepTime != null) {
+            final sessionDuration = lastSession.sleepTime!.difference(lastSession.wakeUpTime);
+            
+            sleepPeriods.add({
+              'sleepTime': lastSession.sleepTime!,
+              'currentWakeUpTime': lastSession.wakeUpTime,
               'sessionDuration': sessionDuration,
             });
           }
@@ -308,104 +322,103 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   ),
                   SizedBox(height: 16),
                   Expanded(
-                    child: ListView.builder(
+                    child: ListView.separated(
                       controller: scrollController,
-                      itemCount: sleepPeriods.length * 2,
-                      itemBuilder: (context, index) {
-                        // If index is even, it's a session info
-                        if (index % 2 == 0) {
-                          final periodIndex = index ~/ 2;
-                          final period = sleepPeriods[periodIndex];
-                          final wakeUpTime = period['currentWakeUpTime'] as DateTime;
-                          final sleepTime = period['sleepTime'] as DateTime;
-                          final sessionDuration = period['sessionDuration'] as Duration;
-
-                          return Card(
-                            child: Padding(
-                              padding: EdgeInsets.all(12.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    DateFormat('MMM dd, yyyy').format(wakeUpTime),
-                                    style: Theme.of(context).textTheme.titleMedium,
-                                  ),
-                                  SizedBox(height: 8),
-                                  Padding(
-                                    padding: EdgeInsets.only(left: 8.0),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Text('Wake: '),
-                                            Text(
-                                              DateFormat('HH:mm').format(wakeUpTime),
-                                              style: Theme.of(context).textTheme.bodyLarge,
-                                            ),
-                                          ],
-                                        ),
-                                        Row(
-                                          children: [
-                                            Text('Sleep: '),
-                                            Text(
-                                              DateFormat('HH:mm').format(sleepTime),
-                                              style: Theme.of(context).textTheme.bodyLarge,
-                                            ),
-                                          ],
-                                        ),
-                                        Row(
-                                          children: [
-                                            Text('Session: '),
-                                            Text(
-                                              '${sessionDuration.inHours}h ${sessionDuration.inMinutes % 60}m',
-                                              style: Theme.of(context).textTheme.bodyLarge!.copyWith(
-                                                color: Theme.of(context).colorScheme.primary,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
+                      itemCount: sleepPeriods.length,
+                      separatorBuilder: (context, index) {
+                        // Don't show separator after the last item
+                        if (index == sleepPeriods.length - 1) {
+                          return SizedBox(height: 4);
                         }
-                        // If index is odd, it's a sleep duration separator
-                        else {
-                          final periodIndex = index ~/ 2;
-                          final period = sleepPeriods[periodIndex];
-                          final sleepDuration = period['sleepDuration'] as Duration;
 
-                          return Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 32, vertical: 8),
-                            child: Row(
+                        final period = sleepPeriods[index];
+                        final sleepDuration = period['sleepDuration'] as Duration;
+
+                        return Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 32, vertical: 8),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 2,
+                                height: 40,
+                                color: Theme.of(context).primaryColor.withOpacity(0.5),
+                              ),
+                              SizedBox(width: 8),
+                              Icon(
+                                Icons.bedtime,
+                                size: 16,
+                                color: Theme.of(context).primaryColor.withOpacity(0.7),
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                '${sleepDuration.inHours}h ${sleepDuration.inMinutes % 60}m of sleep',
+                                style: TextStyle(
+                                  color: Theme.of(context).primaryColor,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                      itemBuilder: (context, index) {
+                        final period = sleepPeriods[index];
+                        final wakeUpTime = period['currentWakeUpTime'] as DateTime;
+                        final sleepTime = period['sleepTime'] as DateTime;
+                        final sessionDuration = period['sessionDuration'] as Duration;
+
+                        return Card(
+                          child: Padding(
+                            padding: EdgeInsets.all(12.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Container(
-                                  width: 2,
-                                  height: 40,
-                                  color: Theme.of(context).primaryColor.withOpacity(0.5),
-                                ),
-                                SizedBox(width: 8),
-                                Icon(
-                                  Icons.bedtime,
-                                  size: 16,
-                                  color: Theme.of(context).primaryColor.withOpacity(0.7),
-                                ),
-                                SizedBox(width: 4),
                                 Text(
-                                  '${sleepDuration.inHours}h ${sleepDuration.inMinutes % 60}m of sleep',
-                                  style: TextStyle(
-                                    color: Theme.of(context).primaryColor,
-                                    fontStyle: FontStyle.italic,
+                                  DateFormat('MMM dd, yyyy').format(wakeUpTime),
+                                  style: Theme.of(context).textTheme.titleMedium,
+                                ),
+                                SizedBox(height: 8),
+                                Padding(
+                                  padding: EdgeInsets.only(left: 8.0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Text('Wake: '),
+                                          Text(
+                                            DateFormat('HH:mm').format(wakeUpTime),
+                                            style: Theme.of(context).textTheme.bodyLarge,
+                                          ),
+                                        ],
+                                      ),
+                                      Row(
+                                        children: [
+                                          Text('Sleep: '),
+                                          Text(
+                                            DateFormat('HH:mm').format(sleepTime),
+                                            style: Theme.of(context).textTheme.bodyLarge,
+                                          ),
+                                        ],
+                                      ),
+                                      Row(
+                                        children: [
+                                          Text('Session: '),
+                                          Text(
+                                            '${sessionDuration.inHours}h ${sessionDuration.inMinutes % 60}m',
+                                            style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                                              color: Theme.of(context).colorScheme.primary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
-                          );
-                        }
+                          ),
+                        );
                       },
                     ),
                   ),
