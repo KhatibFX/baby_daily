@@ -602,28 +602,49 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   String _getMostActiveTimes() {
     if (_sessions.isEmpty) return 'N/A';
-
-    final hours = List<int>.filled(24, 0);
-
+    
+    // Group events by hour
+    final hourCounts = <int, int>{};
+    
+    // Collect all event times
     for (final session in _sessions) {
       for (final entry in [
         ...session.peeEntries.map((e) => e.time),
         ...session.poopEntries.map((e) => e.time),
         ...session.milkEntries.map((e) => e.time),
       ]) {
-        hours[entry.hour]++;
+        final hour = entry.hour;
+        hourCounts[hour] = (hourCounts[hour] ?? 0) + 1;
       }
     }
 
-    final maxEvents = hours.reduce(max);
-    final activeHours = hours
-        .asMap()
-        .entries
-        .where((e) => e.value > maxEvents * 0.7) // Get hours with >70% of max activity
+    if (hourCounts.isEmpty) return 'N/A';
+
+    // Sort hours by number of events
+    final sortedHours = hourCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    // For short date ranges (1 day or less), show only top 3 hours
+    if (_endDate.difference(_startDate).inHours <= 24) {
+      // Only include hours that have at least 2 events
+      final topHours = sortedHours
+          .where((e) => e.value >= 2)
+          .take(3)
+          .map((e) => '${e.key.toString().padLeft(2, '0')}:00')
+          .join(', ');
+      
+      return topHours.isEmpty ? 'N/A' : topHours;
+    }
+
+    // For longer ranges, use the 70% threshold but limit to top 5 hours
+    final maxEvents = sortedHours.first.value;
+    final activeHours = sortedHours
+        .where((e) => e.value > maxEvents * 0.7)
+        .take(5)
         .map((e) => '${e.key.toString().padLeft(2, '0')}:00')
         .join(', ');
 
-    return activeHours;
+    return activeHours.isEmpty ? 'N/A' : activeHours;
   }
 
   Widget _buildRandomPhoto() {
