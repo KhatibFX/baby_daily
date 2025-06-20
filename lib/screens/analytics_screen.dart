@@ -30,10 +30,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     // Calculate the last 7:20 AM that occurred
     final now = DateTime.now();
     final today720AM = DateTime(now.year, now.month, now.day, 7, 20);
-    
-    _startDate = now.isAfter(today720AM)
-        ? today720AM
-        : today720AM.subtract(Duration(days: 1));
+
+    _startDate = now.isAfter(today720AM) ? today720AM : today720AM.subtract(Duration(days: 1));
 
     // End time is always 24 hours after start time
     _endDate = _startDate.add(Duration(days: 1));
@@ -144,6 +142,282 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
+  Widget _buildStatCard(
+    BuildContext context,
+    String title,
+    String value,
+    IconData icon, {
+    VoidCallback? onTap,
+  }) {
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              Icon(icon, size: 24),
+              SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      value,
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                  ],
+                ),
+              ),
+              if (onTap != null) Icon(Icons.chevron_right),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showMilkDetails(BuildContext context) {
+    // Sort sessions from oldest to newest
+    final sortedSessions = List<Session>.from(_sessions)
+      ..sort((a, b) => a.wakeUpTime.compareTo(b.wakeUpTime));
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.3,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, scrollController) {
+            return Container(
+              padding: EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Milk Intake Details',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  SizedBox(height: 16),
+                  Expanded(
+                    child: ListView.builder(
+                      controller: scrollController,
+                      itemCount: sortedSessions.length,
+                      itemBuilder: (context, index) {
+                        final session = sortedSessions[index];
+                        if (session.milkEntries.isEmpty) return SizedBox.shrink();
+
+                        return Card(
+                            child: Padding(
+                          padding: EdgeInsets.all(12.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                DateFormat('MMM dd, yyyy').format(session.wakeUpTime),
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              SizedBox(height: 8),
+                              ...session.milkEntries.map((entry) {
+                                return Padding(
+                                  padding: EdgeInsets.only(left: 8.0, bottom: 4.0),
+                                  child: Row(
+                                    children: [
+                                      Text(
+                                        DateFormat('HH:mm').format(entry.time),
+                                        style: Theme.of(context).textTheme.bodyMedium,
+                                      ),
+                                      SizedBox(width: 16),
+                                      Text(
+                                        '${entry.amount} ml',
+                                        style: Theme.of(context).textTheme.bodyLarge,
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ],
+                          ),
+                        ));
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _formatDuration(Duration d) {
+    final hours = d.inHours;
+    final minutes = d.inMinutes % 60;
+    return '${hours}h ${minutes}m';
+  }
+
+  void _showSleepDetails(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        List<Map<String, dynamic>> sleepPeriods = [];
+
+        // Calculate sleep periods between sessions, iterating backwards to get oldest to newest
+        for (int i = _sessions.length - 2; i >= 0; i--) {
+          final newerSession = _sessions[i];
+          final olderSession = _sessions[i + 1];
+
+          if (olderSession.sleepTime != null) {
+            final sleepDuration = newerSession.wakeUpTime.difference(olderSession.sleepTime!);
+            final sessionDuration = olderSession.sleepTime!.difference(olderSession.wakeUpTime);
+            
+            sleepPeriods.add({
+              'sleepTime': olderSession.sleepTime!,
+              'nextWakeUpTime': newerSession.wakeUpTime,
+              'sleepDuration': sleepDuration,
+              'currentWakeUpTime': olderSession.wakeUpTime,
+              'sessionDuration': sessionDuration,
+            });
+          }
+        }
+
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.3,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, scrollController) {
+            return Container(
+              padding: EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Sleep Details',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  SizedBox(height: 16),
+                  Expanded(
+                    child: ListView.builder(
+                      controller: scrollController,
+                      itemCount: sleepPeriods.length * 2,
+                      itemBuilder: (context, index) {
+                        // If index is even, it's a session info
+                        if (index % 2 == 0) {
+                          final periodIndex = index ~/ 2;
+                          final period = sleepPeriods[periodIndex];
+                          final wakeUpTime = period['currentWakeUpTime'] as DateTime;
+                          final sleepTime = period['sleepTime'] as DateTime;
+                          final sessionDuration = period['sessionDuration'] as Duration;
+
+                          return Card(
+                            child: Padding(
+                              padding: EdgeInsets.all(12.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    DateFormat('MMM dd, yyyy').format(wakeUpTime),
+                                    style: Theme.of(context).textTheme.titleMedium,
+                                  ),
+                                  SizedBox(height: 8),
+                                  Padding(
+                                    padding: EdgeInsets.only(left: 8.0),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Text('Wake: '),
+                                            Text(
+                                              DateFormat('HH:mm').format(wakeUpTime),
+                                              style: Theme.of(context).textTheme.bodyLarge,
+                                            ),
+                                          ],
+                                        ),
+                                        Row(
+                                          children: [
+                                            Text('Sleep: '),
+                                            Text(
+                                              DateFormat('HH:mm').format(sleepTime),
+                                              style: Theme.of(context).textTheme.bodyLarge,
+                                            ),
+                                          ],
+                                        ),
+                                        Row(
+                                          children: [
+                                            Text('Session: '),
+                                            Text(
+                                              '${sessionDuration.inHours}h ${sessionDuration.inMinutes % 60}m',
+                                              style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                                                color: Theme.of(context).colorScheme.primary,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
+                        // If index is odd, it's a sleep duration separator
+                        else {
+                          final periodIndex = index ~/ 2;
+                          final period = sleepPeriods[periodIndex];
+                          final sleepDuration = period['sleepDuration'] as Duration;
+
+                          return Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 32, vertical: 8),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 2,
+                                  height: 40,
+                                  color: Theme.of(context).primaryColor.withOpacity(0.5),
+                                ),
+                                SizedBox(width: 8),
+                                Icon(
+                                  Icons.bedtime,
+                                  size: 16,
+                                  color: Theme.of(context).primaryColor.withOpacity(0.7),
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  '${sleepDuration.inHours}h ${sleepDuration.inMinutes % 60}m of sleep',
+                                  style: TextStyle(
+                                    color: Theme.of(context).primaryColor,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildStatisticsCards(BuildContext context) {
     // Calculate total milk from all milk entries
     final totalMilk = _sessions.fold<int>(
@@ -183,6 +457,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           'Total Milk Intake',
           '$totalMilk ml (${(totalMilk / _sessions.length).toStringAsFixed(0)} ml/session)',
           Icons.local_drink,
+          onTap: () => _showMilkDetails(context),
         ),
         SizedBox(height: 8),
         _buildStatCard(
@@ -190,6 +465,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           'Total Sleep Time',
           '${totalSleepDuration.inHours}h ${totalSleepDuration.inMinutes % 60}m',
           Icons.bedtime,
+          onTap: () => _showSleepDetails(context),
         ),
         SizedBox(height: 8),
         _buildStatCard(
@@ -335,38 +611,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         .join(', ');
 
     return activeHours;
-  }
-
-  Widget _buildStatCard(
-    BuildContext context,
-    String title,
-    String value,
-    IconData icon,
-  ) {
-    return Card(
-      child: Padding(
-        padding: EdgeInsets.all(16.0),
-        child: Row(
-          children: [
-            Icon(icon, size: 32),
-            SizedBox(width: 16),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                Text(
-                  value,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   Widget _buildRandomPhoto() {
