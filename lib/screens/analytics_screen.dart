@@ -272,34 +272,34 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       builder: (context) {
         List<Map<String, dynamic>> sleepPeriods = [];
 
-        // Add all sessions that have sleep duration after them
-        for (int i = _sessions.length - 2; i >= 0; i--) {
-          final newerSession = _sessions[i];
-          final olderSession = _sessions[i + 1];
-
-          if (olderSession.sleepTime != null) {
-            final sleepDuration = newerSession.wakeUpTime.difference(olderSession.sleepTime!);
-            final sessionDuration = olderSession.sleepTime!.difference(olderSession.wakeUpTime);
-            
-            sleepPeriods.add({
-              'sleepTime': olderSession.sleepTime!,
-              'nextWakeUpTime': newerSession.wakeUpTime,
-              'sleepDuration': sleepDuration,
-              'currentWakeUpTime': olderSession.wakeUpTime,
-              'sessionDuration': sessionDuration,
-            });
-          }
-        }
-
-        // Add the last session if it exists
+        // Start from the oldest session
         if (_sessions.isNotEmpty) {
-          final lastSession = _sessions.last;
-          if (lastSession.sleepTime != null) {
-            final sessionDuration = lastSession.sleepTime!.difference(lastSession.wakeUpTime);
+          // First, add all sessions except the newest one
+          for (int i = _sessions.length - 1; i > 0; i--) {
+            final currentSession = _sessions[i];
+            final nextSession = _sessions[i - 1];
+
+            if (currentSession.sleepTime != null) {
+              final sessionDuration = currentSession.sleepTime!.difference(currentSession.wakeUpTime);
+              final sleepDuration = nextSession.wakeUpTime.difference(currentSession.sleepTime!);
+              
+              sleepPeriods.add({
+                'sleepTime': currentSession.sleepTime!,
+                'currentWakeUpTime': currentSession.wakeUpTime,
+                'sessionDuration': sessionDuration,
+                'sleepDuration': sleepDuration,
+              });
+            }
+          }
+
+          // Then add the newest session if it has a sleep time
+          final newestSession = _sessions.first;
+          if (newestSession.sleepTime != null) {
+            final sessionDuration = newestSession.sleepTime!.difference(newestSession.wakeUpTime);
             
             sleepPeriods.add({
-              'sleepTime': lastSession.sleepTime!,
-              'currentWakeUpTime': lastSession.wakeUpTime,
+              'sleepTime': newestSession.sleepTime!,
+              'currentWakeUpTime': newestSession.wakeUpTime,
               'sessionDuration': sessionDuration,
             });
           }
