@@ -1,41 +1,76 @@
 # Baby Daily - Features To Implement
 
-## User & Data Management
-- [ ] User accounts and authentication
-- [ ] Cloud backup/sync of data
-- [ ] Additional data export formats (JSON/CSV)
-- [ ] Multi-baby support
-- [ ] Baby profile
-  - [ ] Name
-  - [ ] Birth date
-  - [ ] Gender
-  - [ ] Weight tracking
-  - [ ] Height tracking
+## Priority 1 - Critical for Launch 🔴
 
-## App Configuration & Settings
+### Internationalization (i18n)
+- [ ] Language localization setup
+  - [ ] English (base)
+  - [ ] Arabic
+  - [ ] String extraction
+  - [ ] RTL support
+  - [ ] Date/time format localization
+  - [ ] Number format localization
+
+### Data Management & Backup
+- [ ] Complete database export/import
+  - [ ] JSON data export with images
+  - [ ] Import functionality
+  - [ ] Image handling during import/export
+  - [ ] Export file structure documentation
+  - [ ] Progress indication for large exports
+
+### App Store Requirements & Legal
+- [ ] Privacy policy document
+- [ ] Terms of service document
+- [ ] App icon
+- [ ] Launch screen
+- [ ] App store screenshots
+  - [ ] iPhone (all required sizes)
+  - [ ] iPad (if supporting)
+  - [ ] Android (various devices)
+- [ ] App preview video
+- [ ] App store descriptions
+  - [ ] Main description
+  - [ ] What's new section
+  - [ ] Keywords optimization
+- [ ] Support contact information
+- [ ] Version history tracking
+
+## Priority 2 - Important Features 🟡
+
+### Settings & Configuration
 - [ ] Settings screen
   - [ ] Units selection (ml/oz, kg/lb)
   - [ ] Time format (12h/24h)
   - [ ] Default wake-up time
-- [ ] Theme support
-  - [ ] Dark mode
-  - [ ] Light mode
-  - [ ] System theme following
-- [ ] Language localization
-- [ ] Notification preferences
+  - [ ] Language selection
+  - [ ] Theme selection
 
-## Notifications & Reminders
-- [ ] Feeding reminders
-  - [ ] Customizable intervals
-  - [ ] Smart predictions based on patterns
-- [ ] Sleep schedule reminders
-- [ ] Medicine/vitamin reminders
-- [ ] Growth tracking reminders
-- [ ] Custom reminders
-  - [ ] One-time
-  - [ ] Recurring
+### Data Privacy & Security
+- [ ] Data encryption
+- [ ] App lock
+  - [ ] PIN
+  - [ ] Biometric (fingerprint/face)
+- [ ] GDPR compliance
+- [ ] COPPA compliance
+- [ ] Data retention settings
 
-## Enhanced Tracking Features
+### Enhanced UX Features
+- [ ] Onboarding tutorial
+- [ ] Dark/Light theme support
+- [ ] Home screen widget
+  - [ ] Quick entry widget
+  - [ ] Latest session info
+
+### Backup & Recovery
+- [ ] Automatic backup scheduling
+- [ ] Backup reminders
+- [ ] Data cleanup tools
+- [ ] Storage management
+
+## Priority 3 - Nice to Have 🟢
+
+### Enhanced Tracking
 - [ ] Growth tracking
   - [ ] Height
   - [ ] Weight
@@ -47,70 +82,38 @@
 - [ ] Developmental milestones
 - [ ] Notes/comments field for sessions
 
-## Privacy & Security
-- [ ] Privacy policy document
-- [ ] Terms of service document
-- [ ] Data encryption
-- [ ] App lock
-  - [ ] PIN
-  - [ ] Biometric (fingerprint/face)
-- [ ] Data retention settings
-- [ ] GDPR compliance
-- [ ] COPPA compliance
-
-## App Store Requirements
-- [ ] App icon
-- [ ] Launch screen
-- [ ] App store screenshots
-- [ ] App preview video
-- [ ] Detailed app description
-- [ ] Keywords optimization
-- [ ] Support contact information
-- [ ] Version history tracking
-
-## Enhanced UX Features
-- [ ] Onboarding tutorial
-- [ ] Quick action shortcuts
-- [ ] Home screen widget
-  - [ ] iOS widget
-  - [ ] Android widget
-- [ ] Share specific events
-- [ ] Data visualization
-  - [ ] Sleep patterns graph
-  - [ ] Feeding patterns graph
-  - [ ] Growth charts
-
-## Backup & Recovery
-- [ ] Automatic backup options
-- [ ] Manual backup trigger
-- [ ] Data recovery mechanism
-- [ ] Data cleanup tools
-- [ ] Data archiving
-
-## Multi-Device Support
-- [ ] Cross-device synchronization
+### Multi-Device Support
+- [ ] User accounts
+- [ ] Cloud sync
 - [ ] Family sharing
 - [ ] Caregiver access levels
   - [ ] Parent (full access)
   - [ ] Babysitter (limited access)
-- [ ] Real-time updates
 
-## Additional Analytics
+### Notifications
+- [ ] Feeding reminders
+  - [ ] Customizable intervals
+  - [ ] Smart predictions based on patterns
+- [ ] Sleep schedule reminders
+- [ ] Medicine/vitamin reminders
+- [ ] Custom reminders
+
+### Additional Analytics
 - [ ] Pattern detection
   - [ ] Sleep patterns
   - [ ] Feeding patterns
 - [ ] Sleep quality analysis
-- [ ] Weekly reports
-- [ ] Monthly reports
+- [ ] Weekly/monthly reports
 - [ ] Growth percentile charts
-- [ ] Customizable date ranges
+- [ ] Data visualization
+  - [ ] Sleep patterns graph
+  - [ ] Feeding patterns graph
 
-## Performance & Technical
-- [ ] Offline support
-- [ ] Data optimization
+### Technical Improvements
+- [ ] Performance optimization
 - [ ] Battery usage optimization
-- [ ] Storage management
 - [ ] Error tracking & reporting
+- [ ] Analytics for app usage
 
 ---
 
@@ -118,4 +121,7 @@ Instructions:
 - Use `[x]` to mark a completed feature
 - Add dates when features are completed
 - Add notes or links to relevant PRs/commits
-- Priority levels can be added with 🔴 (high), 🟡 (medium), 🟢 (low)
+- Priority levels: 
+  - 🔴 Priority 1 - Critical for Launch
+  - 🟡 Priority 2 - Important Features
+  - 🟢 Priority 3 - Nice to Have
