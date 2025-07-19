@@ -114,26 +114,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Date Range',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_left),
-                  onPressed: _decrementDateRange,
-                ),
-                Expanded(
-                  child: Text(
-                    '${DateFormat('MMM dd, yyyy HH:mm').format(_startDate)} - '
-                    '${DateFormat('MMM dd, yyyy HH:mm').format(_endDate)}',
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.arrow_right),
-                  onPressed: _incrementDateRange,
+                Text(
+                  'Date Range',
+                  style: Theme.of(context).textTheme.titleLarge,
                 ),
                 TextButton(
                   onPressed: () async {
@@ -182,6 +168,68 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     }
                   },
                   child: const Text('Change'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: ShapeDecoration(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20), // squircle effect
+                    ),
+                  ),
+                  child: IconButton(
+                    iconSize: 24, // default size
+                    icon: const Icon(Icons.arrow_left),
+                    onPressed: _decrementDateRange,
+                    splashRadius: 28,
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    children: [
+                      Text(
+                        DateFormat('MMM dd, yyyy HH:mm').format(_startDate),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: _isToday(_startDate) ? Colors.blue : null,
+                          fontWeight: _isToday(_startDate) ? FontWeight.bold : null,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const Text('-', textAlign: TextAlign.center),
+                      Text(
+                        DateFormat('MMM dd, yyyy HH:mm').format(_endDate),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: _isToday(_endDate) ? Colors.blue : null,
+                          fontWeight: _isToday(_endDate) ? FontWeight.bold : null,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: ShapeDecoration(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20), // squircle effect
+                    ),
+                  ),
+                  child: IconButton(
+                    iconSize: 24, // default size
+                    icon: const Icon(Icons.arrow_right),
+                    onPressed: _incrementDateRange,
+                    splashRadius: 28,
+                  ),
                 ),
               ],
             ),
@@ -243,5 +291,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         );
       },
     );
+  }
+
+  bool _isToday(DateTime date) {
+    final now = DateTime.now();
+    return date.year == now.year && date.month == now.month && date.day == now.day;
   }
 }
