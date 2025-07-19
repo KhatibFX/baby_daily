@@ -9,6 +9,10 @@ import '../models/session.dart';
 import '../providers/session_provider.dart';
 import '../shared/widgets/photo_view.dart';
 
+// Date range validation constants
+final DateTime kAnalyticsFirstAllowedDate = DateTime(2020);
+final DateTime kAnalyticsLastAllowedDate = DateTime(2030, 12, 31, 23, 59, 59);
+
 class AnalyticsScreen extends StatefulWidget {
   @override
   _AnalyticsScreenState createState() => _AnalyticsScreenState();
@@ -31,10 +35,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final now = DateTime.now();
     final today720AM = DateTime(now.year, now.month, now.day, 7, 20);
 
-    _startDate = now.isAfter(today720AM) ? today720AM : today720AM.subtract(Duration(days: 1));
+    _startDate =
+        now.isAfter(today720AM) ? today720AM : today720AM.subtract(const Duration(days: 1));
 
     // End time is always 24 hours after start time
-    _endDate = _startDate.add(Duration(days: 1));
+    _endDate = _startDate.add(const Duration(days: 1));
   }
 
   Future<void> _loadSessions() async {
@@ -45,20 +50,43 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     });
   }
 
+  void _decrementDateRange() {
+    setState(() {
+      _startDate = _startDate.subtract(const Duration(days: 1));
+      _endDate = _endDate.subtract(const Duration(days: 1));
+    });
+    _loadSessions();
+  }
+
+  void _incrementDateRange() {
+    // Restrict increment so that _endDate does not go beyond the allowed lastDate
+    final newStartDate = _startDate.add(const Duration(days: 1));
+    final newEndDate = _endDate.add(const Duration(days: 1));
+    if (newEndDate.isAfter(kAnalyticsLastAllowedDate)) {
+      // Do not increment if it would exceed the allowed range
+      return;
+    }
+    setState(() {
+      _startDate = newStartDate;
+      _endDate = newEndDate;
+    });
+    _loadSessions();
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildDateRangePicker(context),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           _buildStatisticsCards(context),
           if (_sessions.isNotEmpty) ...[
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             _buildDetailedStats(context),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             _buildRandomPhoto(),
           ],
         ],
@@ -69,7 +97,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Widget _buildDateRangePicker(BuildContext context) {
     return Card(
       child: Padding(
-        padding: EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -77,21 +105,29 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               'Date Range',
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Row(
               children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_left),
+                  onPressed: _decrementDateRange,
+                ),
                 Expanded(
                   child: Text(
                     '${DateFormat('MMM dd, yyyy HH:mm').format(_startDate)} - '
                     '${DateFormat('MMM dd, yyyy HH:mm').format(_endDate)}',
                   ),
                 ),
+                IconButton(
+                  icon: const Icon(Icons.arrow_right),
+                  onPressed: _incrementDateRange,
+                ),
                 TextButton(
                   onPressed: () async {
                     final DateTimeRange? dateRange = await showDateRangePicker(
                       context: context,
-                      firstDate: DateTime(2020), // Allow selecting dates from 2020
-                      lastDate: DateTime(2030), // Allow selecting dates until 2030
+                      firstDate: kAnalyticsFirstAllowedDate, // Use constant
+                      lastDate: kAnalyticsLastAllowedDate, // Use constant
                       initialDateRange: DateTimeRange(
                         start: _startDate,
                         end: _endDate,
@@ -132,7 +168,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       }
                     }
                   },
-                  child: Text('Change'),
+                  child: const Text('Change'),
                 ),
               ],
             ),
@@ -153,11 +189,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(16.0),
           child: Row(
             children: [
               Icon(icon, size: 24),
-              SizedBox(width: 16),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,7 +202,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       title,
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
                       value,
                       style: Theme.of(context).textTheme.bodyLarge,
@@ -174,7 +210,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   ],
                 ),
               ),
-              if (onTap != null) Icon(Icons.chevron_right),
+              if (onTap != null) const Icon(Icons.chevron_right),
             ],
           ),
         ),
@@ -198,7 +234,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           expand: false,
           builder: (context, scrollController) {
             return Container(
-              padding: EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -206,18 +242,18 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     'Milk Intake Details',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   Expanded(
                     child: ListView.builder(
                       controller: scrollController,
                       itemCount: sortedSessions.length,
                       itemBuilder: (context, index) {
                         final session = sortedSessions[index];
-                        if (session.milkEntries.isEmpty) return SizedBox.shrink();
+                        if (session.milkEntries.isEmpty) return const SizedBox.shrink();
 
                         return Card(
                             child: Padding(
-                          padding: EdgeInsets.all(12.0),
+                          padding: const EdgeInsets.all(12.0),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -225,17 +261,17 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                 DateFormat('MMM dd, yyyy').format(session.wakeUpTime),
                                 style: Theme.of(context).textTheme.titleMedium,
                               ),
-                              SizedBox(height: 8),
+                              const SizedBox(height: 8),
                               ...session.milkEntries.map((entry) {
                                 return Padding(
-                                  padding: EdgeInsets.only(left: 8.0, bottom: 4.0),
+                                  padding: const EdgeInsets.only(left: 8.0, bottom: 4.0),
                                   child: Row(
                                     children: [
                                       Text(
                                         DateFormat('HH:mm').format(entry.time),
                                         style: Theme.of(context).textTheme.bodyMedium,
                                       ),
-                                      SizedBox(width: 16),
+                                      const SizedBox(width: 16),
                                       Text(
                                         '${entry.amount} ml',
                                         style: Theme.of(context).textTheme.bodyLarge,
@@ -307,7 +343,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           expand: false,
           builder: (context, scrollController) {
             return Container(
-              padding: EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -315,7 +351,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     'Sleep Details',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   Expanded(
                     child: ListView.separated(
                       controller: scrollController,
@@ -323,14 +359,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       separatorBuilder: (context, index) {
                         // Don't show separator after the last item
                         if (index == sleepPeriods.length - 1) {
-                          return SizedBox(height: 4);
+                          return const SizedBox(height: 4);
                         }
 
                         final period = sleepPeriods[index];
                         final sleepDuration = period['sleepDuration'] as Duration;
 
                         return Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 32, vertical: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
                           child: Row(
                             children: [
                               Container(
@@ -338,13 +374,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                 height: 40,
                                 color: Theme.of(context).primaryColor.withOpacity(0.5),
                               ),
-                              SizedBox(width: 8),
+                              const SizedBox(width: 8),
                               Icon(
                                 Icons.bedtime,
                                 size: 16,
                                 color: Theme.of(context).primaryColor.withOpacity(0.7),
                               ),
-                              SizedBox(width: 4),
+                              const SizedBox(width: 4),
                               Text(
                                 '${sleepDuration.inHours}h ${sleepDuration.inMinutes % 60}m of sleep',
                                 style: TextStyle(
@@ -364,7 +400,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
                         return Card(
                           child: Padding(
-                            padding: EdgeInsets.all(12.0),
+                            padding: const EdgeInsets.all(12.0),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -372,15 +408,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                   DateFormat('MMM dd, yyyy').format(wakeUpTime),
                                   style: Theme.of(context).textTheme.titleMedium,
                                 ),
-                                SizedBox(height: 8),
+                                const SizedBox(height: 8),
                                 Padding(
-                                  padding: EdgeInsets.only(left: 8.0),
+                                  padding: const EdgeInsets.only(left: 8.0),
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
-                                          Text('Wake: '),
+                                          const Text('Wake: '),
                                           Text(
                                             DateFormat('HH:mm').format(wakeUpTime),
                                             style: Theme.of(context).textTheme.bodyLarge,
@@ -389,7 +425,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                       ),
                                       Row(
                                         children: [
-                                          Text('Sleep: '),
+                                          const Text('Sleep: '),
                                           Text(
                                             DateFormat('HH:mm').format(sleepTime),
                                             style: Theme.of(context).textTheme.bodyLarge,
@@ -398,7 +434,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                                       ),
                                       Row(
                                         children: [
-                                          Text('Session: '),
+                                          const Text('Session: '),
                                           Text(
                                             '${sessionDuration.inHours}h ${sessionDuration.inMinutes % 60}m',
                                             style: Theme.of(context).textTheme.bodyLarge!.copyWith(
@@ -459,7 +495,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           '${_sessions.length} (${avgSessionsPerDay.toStringAsFixed(1)}/day)',
           Icons.list,
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         _buildStatCard(
           context,
           'Total Milk Intake',
@@ -467,7 +503,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           Icons.local_drink,
           onTap: () => _showMilkDetails(context),
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         _buildStatCard(
           context,
           'Total Sleep Time',
@@ -475,7 +511,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           Icons.bedtime,
           onTap: () => _showSleepDetails(context),
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         _buildStatCard(
           context,
           'Total Events',
@@ -503,7 +539,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Widget _buildDetailedStats(BuildContext context) {
     return Card(
       child: Padding(
-        padding: EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -511,7 +547,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               'Detailed Statistics',
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             _buildDetailedStatRow('Events per Session', _getAvgEventsPerSession()),
             _buildDetailedStatRow('Average Sleep Between Sessions', _getAvgSleepBetweenSessions()),
             if (_sessions.isNotEmpty) ...[
@@ -526,11 +562,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   Widget _buildDetailedStatRow(String label, String value) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(fontWeight: FontWeight.bold)),
+          Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
           Text(value),
         ],
       ),
@@ -644,14 +680,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Widget _buildRandomPhoto() {
     final sessionsWithPhotos =
         _sessions.where((s) => s.hasSessionPhoto && s.sessionPhotoPath != null).toList();
-    if (sessionsWithPhotos.isEmpty) return SizedBox.shrink();
+    if (sessionsWithPhotos.isEmpty) return const SizedBox.shrink();
 
     final random = Random();
     final randomSession = sessionsWithPhotos[random.nextInt(sessionsWithPhotos.length)];
 
     return Card(
       child: Padding(
-        padding: EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -659,12 +695,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               'Random Moment',
               style: Theme.of(context).textTheme.titleLarge,
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             FutureBuilder<String>(
               future: Provider.of<SessionProvider>(context).photoDirectory,
               builder: (context, pathSnapshot) {
                 if (!pathSnapshot.hasData) {
-                  return CircularProgressIndicator();
+                  return const CircularProgressIndicator();
                 }
 
                 final fullPath = path.join(
@@ -675,7 +711,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 return Column(
                   children: [
                     PhotoView(photoPath: fullPath),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
                       DateFormat('MMM dd, yyyy HH:mm').format(randomSession.wakeUpTime),
                       style: Theme.of(context).textTheme.bodySmall,
