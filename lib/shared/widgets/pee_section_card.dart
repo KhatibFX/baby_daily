@@ -102,14 +102,16 @@ class PeeSectionCard extends StatelessWidget {
       await provider.addPeeEntry(
         sessionId: session.id!,
         amount: PeeAmount.na,
-        time: truncateToMinute(DateTime.now()),
+        time: await getValidEntryTime(
+            context: context, time: truncateToMinute(DateTime.now()), session: session),
       );
     } else {
       // In edit screen - keep in memory only
       final newEntry = PeeEntry(
         sessionId: session.id!,
         amount: PeeAmount.na,
-        time: truncateToMinute(DateTime.now()),
+        time: await getValidEntryTime(
+            context: context, time: truncateToMinute(DateTime.now()), session: session),
       );
       onSessionChanged(session.copyWith(
         peeEntries: List.of(session.peeEntries)..add(newEntry),
@@ -161,8 +163,6 @@ class _PeeEntryItemState extends State<_PeeEntryItem> {
 
   @override
   Widget build(BuildContext context) {
-    final sessionProvider = context.read<SessionProvider>();
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -203,7 +203,7 @@ class _PeeEntryItemState extends State<_PeeEntryItem> {
             firstDate: widget.session.wakeUpTime,
             lastDate: widget.session.sleepTime ?? DateTime.now(),
             onValidate: (time) =>
-                isValidActivityTime(context, time, widget.session, sessionProvider),
+                isValidActivityTime(context: context, time: time, session: widget.session),
             onTimeSelected: (time) {
               widget.onUpdate(widget.entry.copyWith(time: time));
             },

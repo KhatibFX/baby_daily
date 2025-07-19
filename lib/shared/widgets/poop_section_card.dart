@@ -112,7 +112,8 @@ class PoopSectionCard extends StatelessWidget {
         amount: PoopAmount.na,
         consistency: PoopConsistency.normal,
         color: PoopColor.yellow,
-        time: truncateToMinute(DateTime.now()),
+        time: await getValidEntryTime(
+            context: context, time: truncateToMinute(DateTime.now()), session: session),
       );
     } else {
       // In edit screen - keep in memory only
@@ -121,7 +122,8 @@ class PoopSectionCard extends StatelessWidget {
         amount: PoopAmount.na,
         consistency: PoopConsistency.normal,
         color: PoopColor.yellow,
-        time: truncateToMinute(DateTime.now()),
+        time: await getValidEntryTime(
+            context: context, time: truncateToMinute(DateTime.now()), session: session),
       );
       onSessionChanged(session.copyWith(
         poopEntries: List.of(session.poopEntries)..add(newEntry),
@@ -201,7 +203,8 @@ class _PoopEntryItem extends StatelessWidget {
             icon: Icons.access_time,
             firstDate: session.wakeUpTime,
             lastDate: session.sleepTime ?? DateTime.now(),
-            onValidate: (time) => isValidActivityTime(context, time, session, sessionProvider),
+            onValidate: (time) =>
+                isValidActivityTime(context: context, time: time, session: session),
             onTimeSelected: (time) {
               onUpdate(entry.copyWith(time: time));
             },

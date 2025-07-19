@@ -111,14 +111,16 @@ class MilkSectionCard extends StatelessWidget {
       await provider.addMilkEntry(
         sessionId: session.id!,
         amount: 0,
-        time: truncateToMinute(DateTime.now()),
+        time: await getValidEntryTime(
+            context: context, time: truncateToMinute(DateTime.now()), session: session),
       );
     } else {
       // In edit screen - keep in memory only
       final newEntry = MilkEntry(
         sessionId: session.id!,
         amount: 0,
-        time: truncateToMinute(DateTime.now()),
+        time: await getValidEntryTime(
+            context: context, time: truncateToMinute(DateTime.now()), session: session),
       );
       onSessionChanged(session.copyWith(
         milkEntries: List.of(session.milkEntries)..add(newEntry),
@@ -170,7 +172,6 @@ class _MilkEntryItemState extends State<_MilkEntryItem> {
 
   @override
   Widget build(BuildContext context) {
-    final sessionProvider = context.read<SessionProvider>();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -207,7 +208,8 @@ class _MilkEntryItemState extends State<_MilkEntryItem> {
           icon: Icons.access_time,
           firstDate: widget.session.wakeUpTime,
           lastDate: widget.session.sleepTime ?? DateTime.now(),
-          onValidate: (time) => isValidActivityTime(context, time, widget.session, sessionProvider),
+          onValidate: (time) =>
+              isValidActivityTime(context: context, time: time, session: widget.session),
           onTimeSelected: (time) {
             widget.onUpdate(widget.entry.copyWith(time: time));
           },

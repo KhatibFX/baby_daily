@@ -53,6 +53,13 @@ Future<bool> isValidWakeUpTime(
     }
   }
 
+  for (final vitamin in session.vitaminEntries) {
+    if (time.isAfter(vitamin.time)) {
+      showTimeValidationError(context, 'Wake-up time cannot be after any vitamin time');
+      return false;
+    }
+  }
+
   // Rule 3: Can't be after current session's sleep time (if set)
   if (session.sleepTime != null && time.isAfter(session.sleepTime!)) {
     showTimeValidationError(context, 'Wake-up time cannot be after the session\'s sleep time');
@@ -68,12 +75,12 @@ Future<bool> isValidWakeUpTime(
 }
 
 /// Validates sleep time against session rules
-Future<bool> isValidSleepTime(
-  BuildContext context,
-  DateTime time,
-  Session session,
-  SessionProvider provider,
-) async {
+Future<bool> isValidSleepTime({
+  required BuildContext context,
+  required DateTime time,
+  required Session session,
+  required SessionProvider provider,
+}) async {
   // Rule 1: Can't be before current session's wake-up time
   if (time.isBefore(session.wakeUpTime)) {
     showTimeValidationError(context, 'Sleep time cannot be before the session\'s wake-up time');
@@ -102,6 +109,13 @@ Future<bool> isValidSleepTime(
     }
   }
 
+  for (final vitamin in session.vitaminEntries) {
+    if (time.isBefore(vitamin.time)) {
+      showTimeValidationError(context, 'Sleep time cannot be before any vitamin time');
+      return false;
+    }
+  }
+
   // Rule 3: Can't be after next session's wake-up time or now
   final nextSession = await provider.getNextSession(session);
   if (nextSession != null && time.isAfter(nextSession.wakeUpTime)) {
@@ -118,27 +132,33 @@ Future<bool> isValidSleepTime(
 }
 
 /// Validates activity time (pee, poop, milk) against session rules
-Future<bool> isValidActivityTime(
-  BuildContext context,
-  DateTime time,
-  Session session,
-  SessionProvider provider,
-) async {
+Future<bool> isValidActivityTime({
+  required BuildContext context,
+  required DateTime time,
+  required Session session,
+  bool showError = true,
+}) async {
   // Rule 1: Can't be before wake-up time
   if (time.isBefore(session.wakeUpTime)) {
-    showTimeValidationError(context, 'Time cannot be before the session\'s wake-up time');
+    if (showError) {
+      showTimeValidationError(context, 'Time cannot be before the session\'s wake-up time');
+    }
     return false;
   }
 
   // Rule 2: Can't be after sleep time if set
   if (session.sleepTime != null && time.isAfter(session.sleepTime!)) {
-    showTimeValidationError(context, 'Time cannot be after the session\'s sleep time');
+    if (showError) {
+      showTimeValidationError(context, 'Time cannot be after the session\'s sleep time');
+    }
     return false;
   }
 
   // Rule 3: Can't be in the future
   if (time.isAfter(DateTime.now())) {
-    showTimeValidationError(context, 'Time cannot be in the future');
+    if (showError) {
+      showTimeValidationError(context, 'Time cannot be in the future');
+    }
     return false;
   }
 
@@ -175,6 +195,18 @@ Future<DateTime?> showDateTimePicker({
     }
   }
   return null;
+}
+
+Future<DateTime> getValidEntryTime({
+  required BuildContext context,
+  required DateTime time,
+  required Session session,
+}) async {
+  if (await isValidActivityTime(context: context, time: time, session: session, showError: false)) {
+    return time;
+  } else {
+    return truncateToMinute(session.wakeUpTime);
+  }
 }
 
 /// Creates a DateTime with seconds set to 0

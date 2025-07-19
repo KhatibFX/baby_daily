@@ -115,6 +115,7 @@ class EditSessionScreen extends StatelessWidget {
                           sessionProvider.updateSessionWithPeeEntries(editingSession),
                           sessionProvider.updateSessionWithPoopEntries(editingSession),
                           sessionProvider.updateSessionWithMilkEntries(editingSession),
+                          sessionProvider.updateSessionWithVitaminEntries(editingSession),
                         ]);
 
                         if (context.mounted) {

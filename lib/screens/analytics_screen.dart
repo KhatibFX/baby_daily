@@ -6,6 +6,7 @@ import 'package:path/path.dart' as path;
 import 'package:provider/provider.dart';
 
 import '../models/session.dart';
+import '../models/vitamin_entry.dart';
 import '../providers/session_provider.dart';
 import '../shared/widgets/photo_view.dart';
 
@@ -86,6 +87,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           if (_sessions.isNotEmpty) ...[
             const SizedBox(height: 16),
             _buildDetailedStats(context),
+            const SizedBox(height: 16),
+            _buildVitaminIntakeSection(context),
             const SizedBox(height: 16),
             _buildRandomPhoto(),
           ],
@@ -720,6 +723,137 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 );
               },
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVitaminIntakeSection(BuildContext context) {
+    // Gather all vitamin entries from all sessions in the selected range
+    final vitaminEntries = <Map<String, dynamic>>[];
+
+    for (final session in _sessions) {
+      for (final entry in session.vitaminEntries) {
+        vitaminEntries.add({
+          'session': session,
+          'entry': entry,
+        });
+      }
+    }
+
+    if (vitaminEntries.isEmpty) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Vitamin Intake Records',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'No vitamin intake records in this date range.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Sort entries by time (chronological order)
+    vitaminEntries.sort(
+        (a, b) => (a['entry'] as VitaminEntry).time.compareTo((b['entry'] as VitaminEntry).time));
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Vitamin Intake Records (${vitaminEntries.length})',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            ...vitaminEntries.map((item) {
+              final session = item['session'] as Session;
+              final entry = item['entry'] as VitaminEntry;
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6.0),
+                child: Container(
+                  padding: const EdgeInsets.all(12.0),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(8.0),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.medication,
+                            size: 16,
+                            color: entry.type == VitaminType.ad
+                                ? Colors.orange
+                                : Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            DateFormat('MMM dd, yyyy').format(session.wakeUpTime),
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(width: 16),
+                          Text(
+                            DateFormat('HH:mm').format(entry.time),
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                          ),
+                          const SizedBox(width: 16),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: entry.type == VitaminType.ad
+                                  ? Colors.orange.withOpacity(0.2)
+                                  : Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              entry.type.label,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: entry.type == VitaminType.ad
+                                        ? Colors.orange.shade700
+                                        : Theme.of(context).colorScheme.primary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (entry.notes != null && entry.notes!.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'Notes: ${entry.notes}',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                fontStyle: FontStyle.italic,
+                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                              ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
           ],
         ),
       ),

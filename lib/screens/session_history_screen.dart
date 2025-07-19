@@ -1,3 +1,4 @@
+import 'package:baby_daily/models/vitamin_entry.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as path;
@@ -103,56 +104,80 @@ class SessionHistoryScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Pee entries section
-                Text('Pee Events:', style: Theme.of(context).textTheme.titleSmall),
-                ...session.peeEntries.map((entry) => Padding(
-                      padding: EdgeInsets.only(left: 16, top: 4),
-                      child: Row(
-                        children: [
-                          Text('${timeFormat.format(entry.time)} - ${entry.amount.name}'),
-                          if (entry.remarks?.isNotEmpty == true) ...[
-                            SizedBox(width: 8),
-                            Text('(${entry.remarks!})',
-                                style: TextStyle(fontStyle: FontStyle.italic)),
+                if (session.peeEntries.isNotEmpty) ...[
+                  Text('Pee Events:', style: Theme.of(context).textTheme.titleSmall),
+                  ...session.peeEntries.map((entry) => Padding(
+                        padding: EdgeInsets.only(left: 16, top: 4),
+                        child: Row(
+                          children: [
+                            Text('${timeFormat.format(entry.time)} - ${entry.amount.name}'),
+                            if (entry.remarks?.isNotEmpty == true) ...[
+                              SizedBox(width: 8),
+                              Text('(${entry.remarks!})',
+                                  style: TextStyle(fontStyle: FontStyle.italic)),
+                            ],
                           ],
-                        ],
-                      ),
-                    )),
-                SizedBox(height: 8),
+                        ),
+                      )),
+                  SizedBox(height: 8),
+                ],
 
                 // Poop entries section
-                Text('Poop Events:', style: Theme.of(context).textTheme.titleSmall),
-                ...session.poopEntries.map((entry) => Padding(
-                      padding: EdgeInsets.only(left: 16, top: 4),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text('${timeFormat.format(entry.time)} - ${entry.amount.name}'),
-                              SizedBox(width: 8),
-                              Text('(${entry.consistency.name}, ${entry.color.name})'),
-                            ],
-                          ),
-                          if (entry.hasPhoto && entry.photoPath != null)
-                            Padding(
-                              padding: EdgeInsets.only(top: 4),
-                              child: _buildPhotoSection(context, entry.photoPath, ''),
+                if (session.poopEntries.isNotEmpty) ...[
+                  Text('Poop Events:', style: Theme.of(context).textTheme.titleSmall),
+                  ...session.poopEntries.map((entry) => Padding(
+                        padding: EdgeInsets.only(left: 16, top: 4),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text('${timeFormat.format(entry.time)} - ${entry.amount.name}'),
+                                SizedBox(width: 8),
+                                Text('(${entry.consistency.name}, ${entry.color.name})'),
+                              ],
                             ),
-                        ],
-                      ),
-                    )),
-                SizedBox(height: 8),
+                            if (entry.hasPhoto && entry.photoPath != null)
+                              Padding(
+                                padding: EdgeInsets.only(top: 4),
+                                child: _buildPhotoSection(context, entry.photoPath, ''),
+                              ),
+                          ],
+                        ),
+                      )),
+                  SizedBox(height: 8),
+                ],
 
                 // Milk entries section
-                Text('Milk Events:', style: Theme.of(context).textTheme.titleSmall),
-                ...session.milkEntries.map((entry) => Padding(
-                      padding: EdgeInsets.only(left: 16, top: 4),
-                      child: Text('${timeFormat.format(entry.time)} - ${entry.amount}ml'),
-                    )),
-                SizedBox(height: 16),
+                if (session.milkEntries.isNotEmpty) ...[
+                  Text('Milk Events:', style: Theme.of(context).textTheme.titleSmall),
+                  ...session.milkEntries.map((entry) => Padding(
+                        padding: EdgeInsets.only(left: 16, top: 4),
+                        child: Text('${timeFormat.format(entry.time)} - ${entry.amount}ml'),
+                      )),
+                  SizedBox(height: 16),
+                ],
+
+                // Vitamin entries section (new implementation)
+                if (session.vitaminEntries.isNotEmpty) ...[
+                  Text('Vitamin Events:', style: Theme.of(context).textTheme.titleSmall),
+                  ...session.vitaminEntries.map((entry) => Padding(
+                        padding: EdgeInsets.only(left: 16, top: 4),
+                        child: Row(
+                          children: [
+                            Text('${timeFormat.format(entry.time)} - ${entry.type.label}'),
+                            if (entry.notes?.isNotEmpty == true) ...[
+                              SizedBox(width: 8),
+                              Text('(${entry.notes!})',
+                                  style: TextStyle(fontStyle: FontStyle.italic)),
+                            ],
+                          ],
+                        ),
+                      )),
+                  SizedBox(height: 16),
+                ],
 
                 // Other session details
-                _buildDetailRow('Vitamin AD', session.vitaminAD ? 'Yes' : 'No'),
                 if (session.hasSessionPhoto)
                   _buildPhotoSection(context, session.sessionPhotoPath, ''),
                 SizedBox(height: 16),

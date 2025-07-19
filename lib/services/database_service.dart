@@ -1,9 +1,11 @@
-import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import '../models/session.dart';
+import 'package:sqflite/sqflite.dart';
+
+import '../models/milk_entry.dart';
 import '../models/pee_entry.dart';
 import '../models/poop_entry.dart';
-import '../models/milk_entry.dart';
+import '../models/session.dart';
+import '../models/vitamin_entry.dart';
 
 class DatabaseService {
   static final DatabaseService instance = DatabaseService._init();
@@ -23,7 +25,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 6, // Upgraded version for vitamin AD migration
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -80,103 +82,60 @@ class DatabaseService {
         FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE
       )
     ''');
+
+    // Create vitamin_entries table
+    await db.execute('''
+      CREATE TABLE vitamin_entries(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER NOT NULL,
+        time TEXT NOT NULL,
+        type INTEGER NOT NULL,
+        notes TEXT,
+        FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE
+      )
+    ''');
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 4) {
-      // Create new tables
+    if (oldVersion < 5) {
+      // Add vitamin_entries table if upgrading from version 4
       await db.execute('''
-        CREATE TABLE pee_entries(
+        CREATE TABLE vitamin_entries(
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           session_id INTEGER NOT NULL,
-          amount INTEGER NOT NULL,
-          remarks TEXT,
           time TEXT NOT NULL,
+          type TEXT NOT NULL,
+          notes TEXT,
           FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE
         )
       ''');
-
-      await db.execute('''
-        CREATE TABLE poop_entries(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          session_id INTEGER NOT NULL,
-          amount INTEGER NOT NULL,
-          consistency INTEGER NOT NULL,
-          color INTEGER NOT NULL,
-          time TEXT NOT NULL,
-          photo_path TEXT,
-          has_photo INTEGER NOT NULL,
-          FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE
-        )
-      ''');
-
-      await db.execute('''
-        CREATE TABLE milk_entries(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          session_id INTEGER NOT NULL,
-          amount INTEGER NOT NULL,
-          time TEXT NOT NULL,
-          FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE
-        )
-      ''');
-
-      // Copy existing data to new tables
-      await db.execute('''
-        INSERT INTO pee_entries (session_id, amount, remarks, time)
-        SELECT id, pee, peeRemarks, COALESCE(peeTime, wakeUpTime)
-        FROM sessions
-        WHERE pee != 0
-      ''');
-
-      await db.execute('''
-        INSERT INTO poop_entries (session_id, amount, consistency, color, time, photo_path, has_photo)
-        SELECT id, poopAmount, poopConsistency, poopColor, COALESCE(poopTime, wakeUpTime), abnormalPoopPhotoPath, hasAbnormalPoopPhoto
-        FROM sessions
-        WHERE poopAmount != 0
-      ''');
-
-      await db.execute('''
-        INSERT INTO milk_entries (session_id, amount, time)
-        SELECT id, milkIntake, COALESCE(milkTime, wakeUpTime)
-        FROM sessions
-        WHERE milkIntake != 0
-      ''');
-
-      // Create temporary table for sessions
-      await db.execute('CREATE TEMPORARY TABLE sessions_backup(id, wakeUpTime, vitaminAD, sleepTime, sessionPhotoPath, hasSessionPhoto, isClosed)');
-      
-      // Copy data to backup
-      await db.execute('''
-        INSERT INTO sessions_backup 
-        SELECT id, wakeUpTime, vitaminAD, sleepTime, sessionPhotoPath, hasSessionPhoto, isClosed
-        FROM sessions
-      ''');
-
-      // Drop old sessions table
-      await db.execute('DROP TABLE sessions');
-
-      // Create new sessions table
-      await db.execute('''
-        CREATE TABLE sessions(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          wakeUpTime TEXT NOT NULL,
-          vitaminAD INTEGER NOT NULL,
-          sleepTime TEXT,
-          sessionPhotoPath TEXT,
-          hasSessionPhoto INTEGER NOT NULL,
-          isClosed INTEGER NOT NULL
-        )
-      ''');
-
-      // Restore data
-      await db.execute('''
-        INSERT INTO sessions 
-        SELECT id, wakeUpTime, vitaminAD, sleepTime, sessionPhotoPath, hasSessionPhoto, isClosed
-        FROM sessions_backup
-      ''');
-
-      // Drop backup
-      await db.execute('DROP TABLE sessions_backup');
+    }
+    if (oldVersion < 6) {
+      // Migrate legacy vitaminAD to vitamin_entries
+      final sessions = await db.query('sessions', where: 'vitaminAD = ?', whereArgs: [1]);
+      for (final session in sessions) {
+        final sessionId = session['id'] as int;
+        final wakeUpTime = session['wakeUpTime'] as String;
+        // Find first milk entry time for this session
+        final milkEntries = await db.query(
+          'milk_entries',
+          where: 'session_id = ?',
+          whereArgs: [sessionId],
+          orderBy: 'time ASC',
+          limit: 1,
+        );
+        String vitaminTime = wakeUpTime;
+        if (milkEntries.isNotEmpty) {
+          vitaminTime = milkEntries.first['time'] as String;
+        }
+        // Insert vitamin entry (type=0 for AD, notes='')
+        await db.insert('vitamin_entries', {
+          'session_id': sessionId,
+          'time': vitaminTime,
+          'type': 'ad',
+          'notes': null,
+        });
+      }
     }
   }
 
@@ -204,12 +163,11 @@ class DatabaseService {
   Future<List<Session>> getAllSessions() async {
     final db = await instance.database;
     final result = await db.query('sessions', orderBy: 'wakeUpTime DESC');
-    
+
     final sessions = result.map((json) => Session.fromMap(json)).toList();
-    final sessionsWithEntries = await Future.wait(
-      sessions.map((session) => loadSessionWithEntries(session))
-    );
-    
+    final sessionsWithEntries =
+        await Future.wait(sessions.map((session) => loadSessionWithEntries(session)));
+
     return sessionsWithEntries;
   }
 
@@ -221,12 +179,11 @@ class DatabaseService {
       whereArgs: [start.toIso8601String(), end.toIso8601String()],
       orderBy: 'wakeUpTime DESC',
     );
-    
+
     final sessions = result.map((json) => Session.fromMap(json)).toList();
-    final sessionsWithEntries = await Future.wait(
-      sessions.map((session) => loadSessionWithEntries(session))
-    );
-    
+    final sessionsWithEntries =
+        await Future.wait(sessions.map((session) => loadSessionWithEntries(session)));
+
     return sessionsWithEntries;
   }
 
@@ -258,12 +215,8 @@ class DatabaseService {
 
   Future<List<PeeEntry>> getPeeEntriesForSession(int sessionId) async {
     final db = await instance.database;
-    final result = await db.query(
-      'pee_entries',
-      where: 'session_id = ?',
-      whereArgs: [sessionId],
-      orderBy: 'time DESC'
-    );
+    final result = await db.query('pee_entries',
+        where: 'session_id = ?', whereArgs: [sessionId], orderBy: 'time DESC');
     return result.map((json) => PeeEntry.fromMap(json)).toList();
   }
 
@@ -302,12 +255,8 @@ class DatabaseService {
 
   Future<List<PoopEntry>> getPoopEntriesForSession(int sessionId) async {
     final db = await instance.database;
-    final result = await db.query(
-      'poop_entries',
-      where: 'session_id = ?',
-      whereArgs: [sessionId],
-      orderBy: 'time DESC'
-    );
+    final result = await db.query('poop_entries',
+        where: 'session_id = ?', whereArgs: [sessionId], orderBy: 'time DESC');
     return result.map((json) => PoopEntry.fromMap(json)).toList();
   }
 
@@ -346,12 +295,8 @@ class DatabaseService {
 
   Future<List<MilkEntry>> getMilkEntriesForSession(int sessionId) async {
     final db = await instance.database;
-    final result = await db.query(
-      'milk_entries',
-      where: 'session_id = ?',
-      whereArgs: [sessionId],
-      orderBy: 'time ASC'
-    );
+    final result = await db.query('milk_entries',
+        where: 'session_id = ?', whereArgs: [sessionId], orderBy: 'time ASC');
     return result.map((json) => MilkEntry.fromMap(json)).toList();
   }
 
@@ -361,16 +306,6 @@ class DatabaseService {
       'milk_entries',
       where: 'id = ?',
       whereArgs: [id],
-    );
-  }
-
-  Future<void> updateMilkEntry(MilkEntry entry) async {
-    final db = await instance.database;
-    await db.update(
-      'milk_entries',
-      entry.toMap(),
-      where: 'id = ?',
-      whereArgs: [entry.id],
     );
   }
 
@@ -391,11 +326,52 @@ class DatabaseService {
     });
   }
 
+  // Vitamin Entry Methods
+  Future<VitaminEntry> createVitaminEntry(VitaminEntry entry) async {
+    final db = await instance.database;
+    final id = await db.insert('vitamin_entries', entry.toMap());
+    return entry.copyWith(id: id);
+  }
+
+  Future<List<VitaminEntry>> getVitaminEntriesForSession(int sessionId) async {
+    final db = await instance.database;
+    final result = await db.query('vitamin_entries',
+        where: 'session_id = ?', whereArgs: [sessionId], orderBy: 'time ASC');
+    return result.map((json) => VitaminEntry.fromMap(json)).toList();
+  }
+
+  Future<int> deleteVitaminEntry(int id) async {
+    final db = await instance.database;
+    return await db.delete(
+      'vitamin_entries',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> updateSessionVitaminEntries(int sessionId, List<VitaminEntry> entries) async {
+    final db = await instance.database;
+    await db.transaction((txn) async {
+      // Delete all existing entries
+      await txn.delete(
+        'vitamin_entries',
+        where: 'session_id = ?',
+        whereArgs: [sessionId],
+      );
+
+      // Insert new entries
+      for (final entry in entries) {
+        await txn.insert('vitamin_entries', entry.toMap());
+      }
+    });
+  }
+
   /// Clears all data from the database
   Future<void> clearAllSessions() async {
     final db = await instance.database;
     await db.transaction((txn) async {
       // Delete all entries from all tables
+      await txn.delete('vitamin_entries');
       await txn.delete('milk_entries');
       await txn.delete('poop_entries');
       await txn.delete('pee_entries');
@@ -447,6 +423,16 @@ class DatabaseService {
           'time': entry.time.toIso8601String(),
         });
       }
+
+      // Insert vitamin entries
+      for (final entry in session.vitaminEntries) {
+        await txn.insert('vitamin_entries', {
+          'session_id': sessionId,
+          'time': entry.time.toIso8601String(),
+          'type': entry.type.index,
+          'notes': entry.notes,
+        });
+      }
     });
   }
 
@@ -456,11 +442,13 @@ class DatabaseService {
     final peeEntries = await getPeeEntriesForSession(session.id!);
     final poopEntries = await getPoopEntriesForSession(session.id!);
     final milkEntries = await getMilkEntriesForSession(session.id!);
+    final vitaminEntries = await getVitaminEntriesForSession(session.id!);
 
     return session.copyWith(
       peeEntries: peeEntries,
       poopEntries: poopEntries,
       milkEntries: milkEntries,
+      vitaminEntries: vitaminEntries,
     );
   }
 

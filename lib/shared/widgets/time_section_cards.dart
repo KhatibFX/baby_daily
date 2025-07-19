@@ -32,13 +32,14 @@ class WakeUpTimeCard extends StatelessWidget {
             Consumer<SessionProvider>(
               builder: (context, provider, child) {
                 final prevSession = provider.getPreviousSession(session);
-                final firstDate = prevSession?.sleepTime ?? DateTime.now().subtract(Duration(days: 7));
+                final firstDate =
+                    prevSession?.sleepTime ?? DateTime.now().subtract(Duration(days: 7));
                 final lastDate = session.sleepTime ?? DateTime.now();
 
                 // Calculate sleep duration if there's a previous session
-                final sleepDuration = prevSession?.sleepTime != null 
-                  ? session.wakeUpTime.difference(prevSession!.sleepTime!)
-                  : null;
+                final sleepDuration = prevSession?.sleepTime != null
+                    ? session.wakeUpTime.difference(prevSession!.sleepTime!)
+                    : null;
 
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -107,7 +108,8 @@ class SleepTimeCard extends StatelessWidget {
                   icon: Icons.bedtime,
                   firstDate: session.wakeUpTime,
                   lastDate: lastDate,
-                  onValidate: (time) => isValidSleepTime(context, time, session, provider),
+                  onValidate: (time) => isValidSleepTime(
+                      context: context, time: time, session: session, provider: provider),
                   onTimeSelected: (time) {
                     final updatedSession = session.copyWith(sleepTime: time);
                     onSessionChanged(updatedSession);

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:baby_daily/models/vitamin_entry.dart';
 import 'package:excel/excel.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as path;
@@ -35,6 +36,10 @@ class ExcelService {
       'Milk Amounts (ml)',
       'Total Milk (ml)',
       'Vitamin AD',
+      'Vitamin Events',
+      'Vitamin Times',
+      'Vitamin Types',
+      'Vitamin Notes',
       'Has Session Photo'
     ];
 
@@ -94,6 +99,13 @@ class ExcelService {
       final milkAmounts = session.milkEntries.map((e) => e.amount.toString()).join(', ');
       final totalMilk = session.milkEntries.fold(0, (sum, entry) => sum + entry.amount).toString();
 
+      // Process vitamin entries
+      final vitaminEvents = session.vitaminEntries.length.toString();
+      final vitaminTimes = session.vitaminEntries.map((e) => timeFormat.format(e.time)).join(', ');
+      final vitaminTypes = session.vitaminEntries.map((e) => e.type.label).join(', ');
+      final vitaminNotes =
+          session.vitaminEntries.map((e) => e.notes ?? '').where((n) => n.isNotEmpty).join('; ');
+
       final row = [
         dateFormat.format(session.wakeUpTime),
         timeFormat.format(session.wakeUpTime),
@@ -116,6 +128,10 @@ class ExcelService {
         milkAmounts,
         totalMilk,
         session.vitaminAD ? 'Yes' : 'No',
+        vitaminEvents,
+        vitaminTimes,
+        vitaminTypes,
+        vitaminNotes,
         session.hasSessionPhoto ? 'Yes' : 'No',
       ];
 

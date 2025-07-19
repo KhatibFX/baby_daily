@@ -10,6 +10,7 @@ import '../models/milk_entry.dart';
 import '../models/pee_entry.dart';
 import '../models/poop_entry.dart';
 import '../models/session.dart';
+import '../models/vitamin_entry.dart';
 import '../services/database_service.dart';
 
 class SessionProvider with ChangeNotifier {
@@ -460,6 +461,33 @@ class SessionProvider with ChangeNotifier {
     return savedEntry;
   }
 
+  Future<VitaminEntry> addVitaminEntry({
+    required int sessionId,
+    required DateTime time,
+    VitaminType type = VitaminType.ad, // Default to AD as requested
+    String? notes,
+  }) async {
+    final entry = VitaminEntry(
+      sessionId: sessionId,
+      time: time,
+      type: type,
+      notes: notes,
+    );
+
+    // Create entry in DB
+    final savedEntry = await _db.createVitaminEntry(entry);
+
+    // Update in-memory state
+    if (_currentSession?.id == sessionId) {
+      _currentSession!.addVitaminEntry(savedEntry);
+    }
+
+    // Notify listeners after updating in-memory state but before additional DB operations
+    notifyListeners();
+
+    return savedEntry;
+  }
+
   Future<void> updateSessionWithMilkEntries(Session session) async {
     // Update in-memory state first
     if (_currentSession?.id == session.id) {
@@ -517,7 +545,24 @@ class SessionProvider with ChangeNotifier {
     await _db.updateSessionPoopEntries(session.id!, session.poopEntries);
   }
 
-  // Milk Entry Methods
+  Future<void> updateSessionWithVitaminEntries(Session session) async {
+    // Update in-memory state first
+    if (_currentSession?.id == session.id) {
+      _currentSession = session;
+    }
+
+    final index = _sessions.indexWhere((s) => s.id == session.id);
+    if (index != -1) {
+      _sessions[index] = session;
+    }
+
+    // Notify listeners after updating in-memory state but before DB operations
+    notifyListeners();
+
+    // Update DB state
+    await _db.updateSession(session);
+    await _db.updateSessionVitaminEntries(session.id!, session.vitaminEntries);
+  }
 
   // Deletion methods
   Future<bool> deletePeeEntry(int entryId, int sessionId) async {
@@ -597,6 +642,31 @@ class SessionProvider with ChangeNotifier {
 
     // Delete from DB after UI is updated
     final deleted = await _db.deleteMilkEntry(entryId);
+    return deleted > 0;
+  }
+
+  Future<bool> deleteVitaminEntry(int entryId, int sessionId) async {
+    // Update in-memory state first
+    bool found = false;
+
+    if (_currentSession?.id == sessionId) {
+      _currentSession!.removeVitaminEntry(entryId);
+      found = true;
+    }
+
+    final index = _sessions.indexWhere((s) => s.id == sessionId);
+    if (index != -1) {
+      _sessions[index].removeVitaminEntry(entryId);
+      found = true;
+    }
+
+    // Only notify if we found and updated the entry in memory
+    if (found) {
+      notifyListeners();
+    }
+
+    // Delete from DB after UI is updated
+    final deleted = await _db.deleteVitaminEntry(entryId);
     return deleted > 0;
   }
 }
