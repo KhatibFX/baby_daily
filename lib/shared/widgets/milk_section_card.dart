@@ -57,6 +57,7 @@ class MilkSectionCard extends StatelessWidget {
               )
             else
               ExpandableEntryList<MapEntry<int, MilkEntry>>(
+                isComplete: (data) => data.value.isComplete,
                 items: session.milkEntries.asMap().entries.map((entry) {
                   return ExpandableEntryListItem(
                     data: entry,

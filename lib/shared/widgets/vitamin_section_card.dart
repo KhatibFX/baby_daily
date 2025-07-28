@@ -52,6 +52,7 @@ class VitaminSectionCard extends StatelessWidget {
               )
             else
               ExpandableEntryList<MapEntry<int, VitaminEntry>>(
+                isComplete: (data) => data.value.isComplete,
                 items: session.vitaminEntries.asMap().entries.map((entry) {
                   return ExpandableEntryListItem(
                     data: entry,

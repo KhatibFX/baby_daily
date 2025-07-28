@@ -17,6 +17,7 @@ class ExpandableEntryList<T> extends StatefulWidget {
   final Widget? header;
   final int? initialExpandedIndex;
   final bool Function(T data)? shouldExpand;
+  final bool Function(T data)? isComplete;
 
   const ExpandableEntryList({
     Key? key,
@@ -24,6 +25,7 @@ class ExpandableEntryList<T> extends StatefulWidget {
     this.header,
     this.initialExpandedIndex,
     this.shouldExpand,
+    this.isComplete,
   }) : super(key: key);
 
   @override
@@ -90,20 +92,28 @@ class _ExpandableEntryListState<T> extends State<ExpandableEntryList<T>> {
           final item = entry.value;
           final isExpanded = index == _expandedIndex;
 
+          final isEntryComplete = widget.isComplete?.call(item.data) ?? false;
+          
           return Column(
             children: [
               if (index > 0) Divider(height: 1),
-              InkWell(
-                onTap: () {
-                  setState(() {
-                    _expandedIndex = isExpanded ? null : index;
-                  });
-                },
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 8.0),
-                  child: isExpanded
-                      ? item.builder(item.data, true)
-                      : Row(
+              Container(
+                decoration: BoxDecoration(
+                  color: isEntryComplete ? Colors.green.shade50 : null,
+                  borderRadius: BorderRadius.circular(4.0),
+                ),
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      _expandedIndex = isExpanded ? null : index;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(4.0),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                    child: Column(
+                      children: [
+                        Row(
                           children: [
                             Expanded(
                               child: Text(
@@ -111,9 +121,16 @@ class _ExpandableEntryListState<T> extends State<ExpandableEntryList<T>> {
                                 style: Theme.of(context).textTheme.bodyMedium,
                               ),
                             ),
-                            Icon(Icons.expand_more),
+                            Icon(isExpanded ? Icons.expand_less : Icons.expand_more),
                           ],
                         ),
+                        if (isExpanded) ...[
+                          SizedBox(height: 8),
+                          item.builder(item.data, true),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ],

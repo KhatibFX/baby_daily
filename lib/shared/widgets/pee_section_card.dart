@@ -50,6 +50,7 @@ class PeeSectionCard extends StatelessWidget {
               )
             else
               ExpandableEntryList<MapEntry<int, PeeEntry>>(
+                isComplete: (data) => data.value.isComplete,
                 items: session.peeEntries.asMap().entries.map((entry) {
                   return ExpandableEntryListItem(
                     data: entry,

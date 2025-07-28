@@ -53,6 +53,7 @@ class PoopSectionCard extends StatelessWidget {
               )
             else
               ExpandableEntryList<MapEntry<int, PoopEntry>>(
+                isComplete: (data) => data.value.isComplete,
                 items: session.poopEntries.asMap().entries.map((entry) {
                   return ExpandableEntryListItem(
                     data: entry,
