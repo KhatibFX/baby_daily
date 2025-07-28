@@ -1,6 +1,8 @@
 import 'dart:io';
 
-import 'package:baby_daily/models/vitamin_entry.dart';
+import 'package:baby_daily/models/enums/pee_enums.dart';
+import 'package:baby_daily/models/enums/poop_enums.dart';
+import 'package:baby_daily/models/enums/vitamin_enums.dart';
 import 'package:excel/excel.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as path;
@@ -81,28 +83,29 @@ class ExcelService {
       // Process pee entries
       final peeEvents = session.peeEntries.length.toString();
       final peeTimes = session.peeEntries.map((e) => timeFormat.format(e.time)).join(', ');
-      final peeAmounts = session.peeEntries.map((e) => e.amount.name).join(', ');
+      final peeAmounts = session.peeEntries.map((e) => e.amount?.label).join(', ');
       final peeRemarks =
           session.peeEntries.map((e) => e.remarks ?? '').where((r) => r.isNotEmpty).join('; ');
 
       // Process poop entries
       final poopEvents = session.poopEntries.length.toString();
       final poopTimes = session.poopEntries.map((e) => timeFormat.format(e.time)).join(', ');
-      final poopAmounts = session.poopEntries.map((e) => e.amount.name).join(', ');
-      final poopConsistencies = session.poopEntries.map((e) => e.consistency.name).join(', ');
-      final poopColors = session.poopEntries.map((e) => e.color.name).join(', ');
+      final poopAmounts = session.poopEntries.map((e) => e.amount?.label).join(', ');
+      final poopConsistencies = session.poopEntries.map((e) => e.consistency?.label).join(', ');
+      final poopColors = session.poopEntries.map((e) => e.color?.label).join(', ');
       final poopPhotos = session.poopEntries.map((e) => e.hasPhoto ? 'Yes' : 'No').join(', ');
 
       // Process milk entries
       final milkEvents = session.milkEntries.length.toString();
       final milkTimes = session.milkEntries.map((e) => timeFormat.format(e.time)).join(', ');
       final milkAmounts = session.milkEntries.map((e) => e.amount.toString()).join(', ');
-      final totalMilk = session.milkEntries.fold(0, (sum, entry) => sum + entry.amount).toString();
+      final totalMilk =
+          session.milkEntries.fold(0, (sum, entry) => sum + (entry.amount ?? 0)).toString();
 
       // Process vitamin entries
       final vitaminEvents = session.vitaminEntries.length.toString();
       final vitaminTimes = session.vitaminEntries.map((e) => timeFormat.format(e.time)).join(', ');
-      final vitaminTypes = session.vitaminEntries.map((e) => e.type.label).join(', ');
+      final vitaminTypes = session.vitaminEntries.map((e) => e.type?.label).join(', ');
       final vitaminNotes =
           session.vitaminEntries.map((e) => e.notes ?? '').where((n) => n.isNotEmpty).join('; ');
 
@@ -127,7 +130,7 @@ class ExcelService {
         milkTimes,
         milkAmounts,
         totalMilk,
-        session.vitaminAD ? 'Yes' : 'No',
+        session.vitaminEntries.isNotEmpty ? 'Yes' : 'No',
         vitaminEvents,
         vitaminTimes,
         vitaminTypes,

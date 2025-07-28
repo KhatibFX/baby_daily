@@ -1,13 +1,13 @@
 class MilkEntry {
   final int? id;
   final int sessionId;
-  final int amount;
+  final int? amount;
   final DateTime time;
 
   const MilkEntry({
     this.id,
     required this.sessionId,
-    required this.amount,
+    this.amount,
     required this.time,
   });
 
@@ -24,7 +24,7 @@ class MilkEntry {
     return MilkEntry(
       id: map['id'] as int?,
       sessionId: map['session_id'] as int,
-      amount: map['amount'] as int,
+      amount: map['amount'] as int?,
       time: DateTime.parse(map['time'] as String),
     );
   }
@@ -46,4 +46,7 @@ class MilkEntry {
   Map<String, dynamic> toJson() => toMap();
 
   factory MilkEntry.fromJson(Map<String, dynamic> json) => MilkEntry.fromMap(json);
+
+  /// Returns true if this entry has all mandatory fields filled
+  bool get isComplete => amount != null && amount! > 0;
 }

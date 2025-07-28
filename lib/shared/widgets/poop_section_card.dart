@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/enums/poop_enums.dart';
 import '../../models/poop_entry.dart';
 import '../../models/session.dart';
 import '../../providers/session_provider.dart';
@@ -56,7 +57,7 @@ class PoopSectionCard extends StatelessWidget {
                   return ExpandableEntryListItem(
                     data: entry,
                     summaryText: (data) =>
-                        '${data.value.amount.name}, ${data.value.consistency.name}, ${data.value.color.name} at ${_formatTime(data.value.time)}${data.value.hasPhoto ? ' 📷' : ''}',
+                        '${data.value.amount?.label ?? 'Not set'}, ${data.value.consistency?.label ?? 'Not set'}, ${data.value.color?.label ?? 'Not set'} at ${_formatTime(data.value.time)}${data.value.hasPhoto ? ' 📷' : ''}',
                     builder: (data, isExpanded) => _PoopEntryItem(
                       entry: data.value,
                       session: session,
@@ -77,11 +78,7 @@ class PoopSectionCard extends StatelessWidget {
                       onDelete: () async {
                         if (!session.isClosed && data.value.id != null) {
                           final provider = context.read<SessionProvider>();
-                          await provider.deletePoopEntry(
-                            data.value.id!,
-                            session.id!,
-                            photoPath: data.value.photoPath,
-                          );
+                          await provider.deletePoopEntry(data.value.id!, session.id!);
                         } else {
                           final updatedEntries = List.of(session.poopEntries)..removeAt(data.key);
                           onSessionChanged(session.copyWith(poopEntries: updatedEntries));
@@ -90,6 +87,7 @@ class PoopSectionCard extends StatelessWidget {
                     ),
                   );
                 }).toList(),
+                shouldExpand: (data) => !data.value.isComplete,
               ),
           ],
         ),
@@ -104,14 +102,23 @@ class PoopSectionCard extends StatelessWidget {
   Future<void> _addNewPoopEntry(BuildContext context) async {
     if (session.id == null) return;
 
+    // Check if all existing poop entries are complete
+    final incompleteEntries = session.poopEntries.where((entry) => !entry.isComplete).toList();
+    if (incompleteEntries.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please complete all existing poop entries before adding a new one'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     if (!session.isClosed) {
       // In session screen - persist immediately through provider
       final provider = context.read<SessionProvider>();
       await provider.addPoopEntry(
         sessionId: session.id!,
-        amount: PoopAmount.na,
-        consistency: PoopConsistency.normal,
-        color: PoopColor.yellow,
         time: await getValidEntryTime(
             context: context, time: truncateToMinute(DateTime.now()), session: session),
       );
@@ -119,9 +126,6 @@ class PoopSectionCard extends StatelessWidget {
       // In edit screen - keep in memory only
       final newEntry = PoopEntry(
         sessionId: session.id!,
-        amount: PoopAmount.na,
-        consistency: PoopConsistency.normal,
-        color: PoopColor.yellow,
         time: await getValidEntryTime(
             context: context, time: truncateToMinute(DateTime.now()), session: session),
       );
@@ -173,10 +177,6 @@ class _PoopEntryItem extends StatelessWidget {
                           if (selected) {
                             onUpdate(entry.copyWith(
                               amount: amount,
-                              consistency: amount == PoopAmount.na
-                                  ? PoopConsistency.normal
-                                  : entry.consistency,
-                              color: amount == PoopAmount.na ? PoopColor.yellow : entry.color,
                             ));
                           }
                         },
@@ -195,7 +195,7 @@ class _PoopEntryItem extends StatelessWidget {
             ),
           ],
         ),
-        if (entry.amount != PoopAmount.na) ...[
+        if (entry.amount != null) ...[
           SizedBox(height: 8),
           TimePickerRow(
             time: entry.time,

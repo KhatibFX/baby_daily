@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class SessionActionsBar extends StatelessWidget {
   final bool showCloseButton;
-  final VoidCallback? onClose;
+  final Future<void> Function()? onClose;
   final String? errorMessage;
 
   const SessionActionsBar({
@@ -21,7 +21,7 @@ class SessionActionsBar extends StatelessWidget {
         SizedBox(height: 20),
         Center(
           child: ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (errorMessage != null) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
@@ -31,7 +31,7 @@ class SessionActionsBar extends StatelessWidget {
                 );
                 return;
               }
-              onClose?.call();
+              await onClose?.call();
             },
             child: Text('Close Session'),
             style: ElevatedButton.styleFrom(

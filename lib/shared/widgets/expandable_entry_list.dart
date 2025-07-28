@@ -16,12 +16,14 @@ class ExpandableEntryList<T> extends StatefulWidget {
   final List<ExpandableEntryListItem<T>> items;
   final Widget? header;
   final int? initialExpandedIndex;
+  final bool Function(T data)? shouldExpand;
 
   const ExpandableEntryList({
     Key? key,
     required this.items,
     this.header,
     this.initialExpandedIndex,
+    this.shouldExpand,
   }) : super(key: key);
 
   @override
@@ -34,8 +36,19 @@ class _ExpandableEntryListState<T> extends State<ExpandableEntryList<T>> {
   @override
   void initState() {
     super.initState();
-    // Use initialExpandedIndex if provided, otherwise expand the last entry
-    _expandedIndex = widget.initialExpandedIndex ?? (widget.items.isEmpty ? null : widget.items.length - 1);
+    // Use initialExpandedIndex if provided
+    if (widget.initialExpandedIndex != null) {
+      _expandedIndex = widget.initialExpandedIndex;
+    }
+    // If shouldExpand function is provided, find first entry that should be expanded
+    else if (widget.shouldExpand != null) {
+      _expandedIndex = widget.items.indexWhere((item) => widget.shouldExpand!(item.data));
+      if (_expandedIndex == -1) _expandedIndex = null;
+    }
+    // Otherwise, expand the last entry (original behavior)
+    else {
+      _expandedIndex = widget.items.isEmpty ? null : widget.items.length - 1;
+    }
   }
 
   @override
@@ -45,6 +58,12 @@ class _ExpandableEntryListState<T> extends State<ExpandableEntryList<T>> {
     if (widget.items.length > oldWidget.items.length) {
       setState(() {
         _expandedIndex = widget.items.length - 1;
+      });
+    }
+    // If items were removed, clear expansion to avoid expanding wrong entry
+    else if (widget.items.length < oldWidget.items.length) {
+      setState(() {
+        _expandedIndex = null;
       });
     }
     // If initialExpandedIndex changed, update expanded index

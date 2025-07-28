@@ -1,5 +1,5 @@
+import 'package:baby_daily/models/enums/vitamin_enums.dart';
 import 'package:baby_daily/models/session.dart';
-import 'package:baby_daily/models/vitamin_entry.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -35,6 +35,7 @@ class AnalyticsVitaminDetails extends StatelessWidget {
                             style: Theme.of(context).textTheme.titleMedium),
                         const SizedBox(height: 8),
                         ...session.vitaminEntries.map((entry) {
+                          if (entry.type == null) return const SizedBox.shrink();
                           return Padding(
                             padding: const EdgeInsets.only(left: 8.0, bottom: 4.0),
                             child: Row(
@@ -58,7 +59,7 @@ class AnalyticsVitaminDetails extends StatelessWidget {
                                         : Theme.of(context).colorScheme.primary.withOpacity(0.2),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
-                                  child: Text(entry.type.label,
+                                  child: Text(entry.type!.label,
                                       style: Theme.of(context).textTheme.bodyLarge),
                                 ),
                                 SizedBox(

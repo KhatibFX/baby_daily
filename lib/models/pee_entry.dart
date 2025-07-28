@@ -1,17 +1,16 @@
-// Import the enums from Session model since they're shared
-import 'session.dart';
+import 'enums/pee_enums.dart';
 
 class PeeEntry {
   final int? id;
   final int sessionId;
-  final PeeAmount amount;
+  final PeeAmount? amount;
   final String? remarks;
   final DateTime time;
 
   const PeeEntry({
     this.id,
     required this.sessionId,
-    required this.amount,
+    this.amount,
     this.remarks,
     required this.time,
   });
@@ -20,7 +19,7 @@ class PeeEntry {
     return {
       'id': id,
       'session_id': sessionId,
-      'amount': amount.index,
+      'amount': amount?.name,
       'remarks': remarks,
       'time': time.toIso8601String(),
     };
@@ -30,7 +29,7 @@ class PeeEntry {
     return PeeEntry(
       id: map['id'] as int?,
       sessionId: map['session_id'] as int,
-      amount: PeeAmount.values[map['amount'] as int],
+      amount: PeeAmountExtension.fromString(map['amount'] as String?),
       remarks: map['remarks'] as String?,
       time: DateTime.parse(map['time'] as String),
     );
@@ -55,4 +54,7 @@ class PeeEntry {
       time: time ?? this.time,
     );
   }
+
+  /// Returns true if this entry has all mandatory fields filled
+  bool get isComplete => amount != null;
 }

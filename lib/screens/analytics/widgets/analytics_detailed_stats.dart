@@ -94,7 +94,7 @@ class AnalyticsDetailedStats extends StatelessWidget {
     int totalMilk = 0;
     for (final session in sessions) {
       totalFeeds += session.milkEntries.length;
-      totalMilk += session.milkEntries.fold<int>(0, (sum, entry) => sum + entry.amount);
+      totalMilk += session.milkEntries.fold<int>(0, (sum, entry) => sum + (entry.amount ?? 0));
     }
     if (totalFeeds == 0) return 'N/A';
     return '${(totalMilk / totalFeeds).toStringAsFixed(0)} ml';

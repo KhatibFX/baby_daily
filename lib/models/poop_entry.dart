@@ -1,12 +1,11 @@
-// Import the enums from Session model since they're shared
-import 'session.dart';
+import 'enums/poop_enums.dart';
 
 class PoopEntry {
   final int? id;
   final int sessionId;
-  final PoopAmount amount;
-  final PoopConsistency consistency;
-  final PoopColor color;
+  final PoopAmount? amount;
+  final PoopConsistency? consistency;
+  final PoopColor? color;
   final DateTime time;
   final String? photoPath;
   final bool hasPhoto;
@@ -14,9 +13,9 @@ class PoopEntry {
   const PoopEntry({
     this.id,
     required this.sessionId,
-    required this.amount,
-    required this.consistency,
-    required this.color,
+    this.amount,
+    this.consistency,
+    this.color,
     required this.time,
     this.photoPath,
     this.hasPhoto = false,
@@ -26,9 +25,9 @@ class PoopEntry {
     return {
       'id': id,
       'session_id': sessionId,
-      'amount': amount.index,
-      'consistency': consistency.index,
-      'color': color.index,
+      'amount': amount?.name,
+      'consistency': consistency?.name,
+      'color': color?.name,
       'time': time.toIso8601String(),
       'photo_path': photoPath,
       'has_photo': hasPhoto ? 1 : 0,
@@ -39,9 +38,9 @@ class PoopEntry {
     return PoopEntry(
       id: map['id'] as int?,
       sessionId: map['session_id'] as int,
-      amount: PoopAmount.values[map['amount'] as int],
-      consistency: PoopConsistency.values[map['consistency'] as int],
-      color: PoopColor.values[map['color'] as int],
+      amount: PoopAmountExtension.fromString(map['amount'] as String?),
+      consistency: PoopConsistencyExtension.fromString(map['consistency'] as String?),
+      color: PoopColorExtension.fromString(map['color'] as String?),
       time: DateTime.parse(map['time'] as String),
       photoPath: map['photo_path'] as String?,
       hasPhoto: map['has_photo'] == 1,
@@ -73,4 +72,7 @@ class PoopEntry {
       hasPhoto: hasPhoto ?? this.hasPhoto,
     );
   }
+
+  /// Returns true if this entry has all mandatory fields filled
+  bool get isComplete => amount != null && consistency != null && color != null;
 }

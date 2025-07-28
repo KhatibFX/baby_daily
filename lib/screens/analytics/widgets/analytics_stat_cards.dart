@@ -26,7 +26,7 @@ class AnalyticsStatCards extends StatelessWidget {
     final totalMilk = sessions.fold<int>(
       0,
       (sum, session) =>
-          sum + session.milkEntries.fold<int>(0, (milkSum, entry) => milkSum + entry.amount),
+          sum + session.milkEntries.fold<int>(0, (milkSum, entry) => milkSum + (entry.amount ?? 0)),
     );
     var totalSleepDuration = Duration.zero;
     for (int i = 0; i < sessions.length - 1; i++) {

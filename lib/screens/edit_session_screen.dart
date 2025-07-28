@@ -104,6 +104,22 @@ class EditSessionScreen extends StatelessWidget {
               return TextButton(
                 onPressed: hasChanges
                     ? () async {
+                        // Validate that all entries are complete before saving
+                        if (!editingSession.hasCompleteEntries) {
+                          if (context.mounted) {
+                            final incompleteTypes = editingSession.incompleteEntryTypes;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Cannot save session. Please complete all entries: ${incompleteTypes.join(', ')}',
+                                ),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                          return;
+                        }
+
                         final sessionProvider = context.read<SessionProvider>();
 
                         // First clean up old photos that were replaced

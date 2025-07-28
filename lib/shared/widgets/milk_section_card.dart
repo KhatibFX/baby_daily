@@ -61,7 +61,7 @@ class MilkSectionCard extends StatelessWidget {
                   return ExpandableEntryListItem(
                     data: entry,
                     summaryText: (data) =>
-                        '${data.value.amount} ml at ${_formatTime(data.value.time)}',
+                        '${data.value.amount ?? 'Not set'} ml at ${_formatTime(data.value.time)}',
                     builder: (data, isExpanded) => _MilkEntryItem(
                       entry: data.value,
                       session: session,
@@ -83,13 +83,15 @@ class MilkSectionCard extends StatelessWidget {
                           final provider = context.read<SessionProvider>();
                           await provider.deleteMilkEntry(data.value.id!, session.id!);
                         } else {
-                          final updatedEntries = List.of(session.milkEntries)..removeAt(data.key);
+                          final updatedEntries = List.of(session.milkEntries);
+                          updatedEntries.removeAt(data.key);
                           onSessionChanged(session.copyWith(milkEntries: updatedEntries));
                         }
                       },
                     ),
                   );
                 }).toList(),
+                shouldExpand: (data) => !data.value.isComplete,
               ),
           ],
         ),
@@ -104,13 +106,24 @@ class MilkSectionCard extends StatelessWidget {
   void _addNewMilkEntry(BuildContext context) async {
     if (session.id == null) return;
 
+    // Check if all existing milk entries are complete
+    final incompleteEntries = session.milkEntries.where((entry) => !entry.isComplete).toList();
+    if (incompleteEntries.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please complete all existing milk entries before adding a new one'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     if (!session.isClosed) {
       // In session screen - persist immediately to DB
       // The provider will handle updating the UI through notifyListeners
       final provider = context.read<SessionProvider>();
       await provider.addMilkEntry(
         sessionId: session.id!,
-        amount: 0,
         time: await getValidEntryTime(
             context: context, time: truncateToMinute(DateTime.now()), session: session),
       );
@@ -118,7 +131,6 @@ class MilkSectionCard extends StatelessWidget {
       // In edit screen - keep in memory only
       final newEntry = MilkEntry(
         sessionId: session.id!,
-        amount: 0,
         time: await getValidEntryTime(
             context: context, time: truncateToMinute(DateTime.now()), session: session),
       );
@@ -153,14 +165,15 @@ class _MilkEntryItemState extends State<_MilkEntryItem> {
   @override
   void initState() {
     super.initState();
-    _amountController = TextEditingController(text: widget.entry.amount.toString());
+    _amountController = TextEditingController(text: widget.entry.amount?.toString() ?? '');
   }
 
   @override
   void didUpdateWidget(_MilkEntryItem oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.entry.amount.toString() != _amountController.text) {
-      _amountController.text = widget.entry.amount.toString();
+    final newText = widget.entry.amount?.toString() ?? '';
+    if (newText != _amountController.text) {
+      _amountController.text = newText;
     }
   }
 
@@ -186,7 +199,7 @@ class _MilkEntryItemState extends State<_MilkEntryItem> {
                 keyboardType: TextInputType.number,
                 controller: _amountController,
                 onChanged: (value) {
-                  final amount = int.tryParse(value) ?? 0;
+                  final amount = value.isEmpty ? null : int.tryParse(value);
                   widget.onUpdate(widget.entry.copyWith(amount: amount));
                 },
               ),

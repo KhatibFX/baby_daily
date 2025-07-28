@@ -1,5 +1,8 @@
 import 'dart:io';
 
+import 'package:baby_daily/models/enums/pee_enums.dart';
+import 'package:baby_daily/models/enums/poop_enums.dart';
+import 'package:baby_daily/models/enums/vitamin_enums.dart';
 import 'package:baby_daily/shared/session_utils.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
@@ -153,7 +156,12 @@ class SessionProvider with ChangeNotifier {
     }
   }
 
-  Future<void> closeSession(Session session, DateTime sleepTime) async {
+  Future<bool> closeSession(Session session, DateTime sleepTime) async {
+    // Check if all entries are complete
+    if (!session.hasCompleteEntries) {
+      return false; // Return false to indicate validation failed
+    }
+
     final updatedSession = session.copyWith(sleepTime: sleepTime, isClosed: true);
 
     // Update in-memory state first
@@ -171,13 +179,20 @@ class SessionProvider with ChangeNotifier {
 
     // Update DB state
     await _db.updateSession(updatedSession);
+    return true; // Return true to indicate success
   }
 
-  Future<void> closeCurrentSession() async {
-    if (_currentSession == null || _currentSession!.isClosed) return;
-    if (_currentSession!.sleepTime == null) return;
+  Future<bool> closeCurrentSession() async {
+    if (_currentSession == null || _currentSession!.isClosed) return false;
+    if (_currentSession!.sleepTime == null) return false;
+
+    // Check if all entries are complete
+    if (!_currentSession!.hasCompleteEntries) {
+      return false; // Return false to indicate validation failed
+    }
 
     await closeSession(_currentSession!, _currentSession!.sleepTime!);
+    return true; // Return true to indicate success
   }
 
   Future<List<Session>> getSessionsInRange(DateTime start, DateTime end) async {
@@ -378,7 +393,7 @@ class SessionProvider with ChangeNotifier {
   // Entry Management Methods
   Future<PeeEntry> addPeeEntry({
     required int sessionId,
-    required PeeAmount amount,
+    PeeAmount? amount,
     String? remarks,
     required DateTime time,
   }) async {
@@ -405,9 +420,9 @@ class SessionProvider with ChangeNotifier {
 
   Future<PoopEntry> addPoopEntry({
     required int sessionId,
-    required PoopAmount amount,
-    required PoopConsistency consistency,
-    required PoopColor color,
+    PoopAmount? amount,
+    PoopConsistency? consistency,
+    PoopColor? color,
     required DateTime time,
     String? photoPath,
     bool hasPhoto = false,
@@ -438,7 +453,7 @@ class SessionProvider with ChangeNotifier {
 
   Future<MilkEntry> addMilkEntry({
     required int sessionId,
-    required int amount,
+    int? amount,
     required DateTime time,
   }) async {
     final entry = MilkEntry(
@@ -464,7 +479,7 @@ class SessionProvider with ChangeNotifier {
   Future<VitaminEntry> addVitaminEntry({
     required int sessionId,
     required DateTime time,
-    VitaminType type = VitaminType.ad, // Default to AD as requested
+    VitaminType? type,
     String? notes,
   }) async {
     final entry = VitaminEntry(

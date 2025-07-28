@@ -1,43 +1,17 @@
-enum VitaminType {
-  ad,
-  other,
-  // Future types can be added here
-}
-
-extension VitaminTypeExtension on VitaminType {
-  String get label {
-    switch (this) {
-      case VitaminType.ad:
-        return 'AD';
-      case VitaminType.other:
-        return 'Other';
-    }
-  }
-
-  static VitaminType fromString(String value) {
-    switch (value.toLowerCase()) {
-      case 'ad':
-        return VitaminType.ad;
-      case 'other':
-        return VitaminType.other;
-      default:
-        return VitaminType.other;
-    }
-  }
-}
+import 'enums/vitamin_enums.dart';
 
 class VitaminEntry {
   final int? id;
   final int sessionId;
   final DateTime time;
-  final VitaminType type;
+  final VitaminType? type;
   final String? notes;
 
   const VitaminEntry({
     this.id,
     required this.sessionId,
     required this.time,
-    this.type = VitaminType.ad, // Default to AD
+    this.type,
     this.notes,
   });
 
@@ -46,7 +20,7 @@ class VitaminEntry {
       'id': id,
       'session_id': sessionId,
       'time': time.toIso8601String(),
-      'type': type.name,
+      'type': type?.name,
       'notes': notes,
     };
   }
@@ -56,7 +30,7 @@ class VitaminEntry {
       id: map['id'] as int?,
       sessionId: map['session_id'] as int,
       time: DateTime.parse(map['time'] as String),
-      type: VitaminTypeExtension.fromString(map['type'] as String),
+      type: map['type'] != null ? VitaminTypeExtension.fromString(map['type'] as String) : null,
       notes: map['notes'] as String?,
     );
   }
@@ -80,4 +54,7 @@ class VitaminEntry {
   Map<String, dynamic> toJson() => toMap();
 
   factory VitaminEntry.fromJson(Map<String, dynamic> json) => VitaminEntry.fromMap(json);
+
+  /// Returns true if this entry has all mandatory fields filled
+  bool get isComplete => type != null;
 }

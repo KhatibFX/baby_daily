@@ -89,7 +89,21 @@ class SessionScreen extends StatelessWidget {
                 SizedBox(height: 20),
                 SessionActionsBar(
                   showCloseButton: !session.isClosed,
-                  onClose: () => sessionProvider.closeCurrentSession(),
+                  onClose: () async {
+                    final success = await sessionProvider.closeCurrentSession();
+                    if (!success && sessionProvider.currentSession != null) {
+                      final incompleteTypes = sessionProvider.currentSession!.incompleteEntryTypes;
+                      if (incompleteTypes.isNotEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Please complete all entries before closing the session. Incomplete: ${incompleteTypes.join(', ')}'),
+                            backgroundColor: Colors.red,
+                            duration: Duration(seconds: 4),
+                          ),
+                        );
+                      }
+                    }
+                  },
                   errorMessage: session.sleepTime == null
                       ? 'Please set a sleep time before closing the session'
                       : null,

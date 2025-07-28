@@ -1,4 +1,4 @@
-import 'package:baby_daily/models/vitamin_entry.dart';
+import 'package:baby_daily/models/enums/vitamin_enums.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as path;
@@ -106,45 +106,51 @@ class SessionHistoryScreen extends StatelessWidget {
                 // Pee entries section
                 if (session.peeEntries.isNotEmpty) ...[
                   Text('Pee Events:', style: Theme.of(context).textTheme.titleSmall),
-                  ...session.peeEntries.map((entry) => Padding(
-                        padding: EdgeInsets.only(left: 16, top: 4),
-                        child: Row(
-                          children: [
-                            Text('${timeFormat.format(entry.time)} - ${entry.amount.name}'),
-                            if (entry.remarks?.isNotEmpty == true) ...[
-                              SizedBox(width: 8),
-                              Text('(${entry.remarks!})',
-                                  style: TextStyle(fontStyle: FontStyle.italic)),
+                  ...session.peeEntries.map((entry) => entry.amount == null
+                      ? SizedBox.shrink()
+                      : Padding(
+                          padding: EdgeInsets.only(left: 16, top: 4),
+                          child: Row(
+                            children: [
+                              Text('${timeFormat.format(entry.time)} - ${entry.amount!.name}'),
+                              if (entry.remarks?.isNotEmpty == true) ...[
+                                SizedBox(width: 8),
+                                Text('(${entry.remarks!})',
+                                    style: TextStyle(fontStyle: FontStyle.italic)),
+                              ],
                             ],
-                          ],
-                        ),
-                      )),
+                          ),
+                        )),
                   SizedBox(height: 8),
                 ],
 
                 // Poop entries section
                 if (session.poopEntries.isNotEmpty) ...[
                   Text('Poop Events:', style: Theme.of(context).textTheme.titleSmall),
-                  ...session.poopEntries.map((entry) => Padding(
-                        padding: EdgeInsets.only(left: 16, top: 4),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text('${timeFormat.format(entry.time)} - ${entry.amount.name}'),
-                                SizedBox(width: 8),
-                                Text('(${entry.consistency.name}, ${entry.color.name})'),
-                              ],
-                            ),
-                            if (entry.hasPhoto && entry.photoPath != null)
-                              Padding(
-                                padding: EdgeInsets.only(top: 4),
-                                child: _buildPhotoSection(context, entry.photoPath, ''),
+                  ...session.poopEntries.map((entry) => entry.amount == null ||
+                          entry.color == null ||
+                          entry.consistency == null
+                      ? SizedBox.shrink()
+                      : Padding(
+                          padding: EdgeInsets.only(left: 16, top: 4),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text('${timeFormat.format(entry.time)} - ${entry.amount!.name}'),
+                                  SizedBox(width: 8),
+                                  Text('(${entry.consistency!.name}, ${entry.color!.name})'),
+                                ],
                               ),
-                          ],
-                        ),
-                      )),
+                              if (entry.hasPhoto && entry.photoPath != null)
+                                Padding(
+                                  padding: EdgeInsets.only(top: 4),
+                                  child: _buildPhotoSection(context, entry.photoPath, ''),
+                                ),
+                            ],
+                          ),
+                        )),
                   SizedBox(height: 8),
                 ],
 
@@ -161,19 +167,21 @@ class SessionHistoryScreen extends StatelessWidget {
                 // Vitamin entries section (new implementation)
                 if (session.vitaminEntries.isNotEmpty) ...[
                   Text('Vitamin Events:', style: Theme.of(context).textTheme.titleSmall),
-                  ...session.vitaminEntries.map((entry) => Padding(
-                        padding: EdgeInsets.only(left: 16, top: 4),
-                        child: Row(
-                          children: [
-                            Text('${timeFormat.format(entry.time)} - ${entry.type.label}'),
-                            if (entry.notes?.isNotEmpty == true) ...[
-                              SizedBox(width: 8),
-                              Text('(${entry.notes!})',
-                                  style: TextStyle(fontStyle: FontStyle.italic)),
+                  ...session.vitaminEntries.map((entry) => entry.type == null
+                      ? SizedBox.shrink()
+                      : Padding(
+                          padding: EdgeInsets.only(left: 16, top: 4),
+                          child: Row(
+                            children: [
+                              Text('${timeFormat.format(entry.time)} - ${entry.type!.label}'),
+                              if (entry.notes?.isNotEmpty == true) ...[
+                                SizedBox(width: 8),
+                                Text('(${entry.notes!})',
+                                    style: TextStyle(fontStyle: FontStyle.italic)),
+                              ],
                             ],
-                          ],
-                        ),
-                      )),
+                          ),
+                        )),
                   SizedBox(height: 16),
                 ],
 
@@ -238,22 +246,6 @@ class SessionHistoryScreen extends StatelessWidget {
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          Text(value),
         ],
       ),
     );

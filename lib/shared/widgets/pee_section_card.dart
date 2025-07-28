@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/enums/pee_enums.dart';
 import '../../models/pee_entry.dart';
 import '../../models/session.dart';
 import '../../providers/session_provider.dart';
@@ -53,7 +54,7 @@ class PeeSectionCard extends StatelessWidget {
                   return ExpandableEntryListItem(
                     data: entry,
                     summaryText: (data) =>
-                        '${data.value.amount.name} at ${_formatTime(data.value.time)}${data.value.remarks?.isNotEmpty == true ? ' - ${data.value.remarks}' : ''}',
+                        '${data.value.amount?.label ?? 'Not set'} at ${_formatTime(data.value.time)}${data.value.remarks?.isNotEmpty == true ? ' - ${data.value.remarks}' : ''}',
                     builder: (data, isExpanded) => _PeeEntryItem(
                       entry: data.value,
                       session: session,
@@ -75,13 +76,15 @@ class PeeSectionCard extends StatelessWidget {
                           final provider = context.read<SessionProvider>();
                           await provider.deletePeeEntry(data.value.id!, session.id!);
                         } else {
-                          final updatedEntries = List.of(session.peeEntries)..removeAt(data.key);
+                          final updatedEntries = List.of(session.peeEntries);
+                          updatedEntries.removeAt(data.key);
                           onSessionChanged(session.copyWith(peeEntries: updatedEntries));
                         }
                       },
                     ),
                   );
                 }).toList(),
+                shouldExpand: (data) => !data.value.isComplete,
               ),
           ],
         ),
@@ -96,12 +99,23 @@ class PeeSectionCard extends StatelessWidget {
   Future<void> _addNewPeeEntry(BuildContext context) async {
     if (session.id == null) return;
 
+    // Check if all existing pee entries are complete
+    final incompleteEntries = session.peeEntries.where((entry) => !entry.isComplete).toList();
+    if (incompleteEntries.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please complete all existing pee entries before adding a new one'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     if (!session.isClosed) {
       // In session screen - persist immediately through provider
       final provider = context.read<SessionProvider>();
       await provider.addPeeEntry(
         sessionId: session.id!,
-        amount: PeeAmount.na,
         time: await getValidEntryTime(
             context: context, time: truncateToMinute(DateTime.now()), session: session),
       );
@@ -109,7 +123,6 @@ class PeeSectionCard extends StatelessWidget {
       // In edit screen - keep in memory only
       final newEntry = PeeEntry(
         sessionId: session.id!,
-        amount: PeeAmount.na,
         time: await getValidEntryTime(
             context: context, time: truncateToMinute(DateTime.now()), session: session),
       );
@@ -194,7 +207,7 @@ class _PeeEntryItemState extends State<_PeeEntryItem> {
             ),
           ],
         ),
-        if (widget.entry.amount != PeeAmount.na) ...[
+        if (widget.entry.amount != null) ...[
           SizedBox(height: 8),
           TimePickerRow(
             time: widget.entry.time,

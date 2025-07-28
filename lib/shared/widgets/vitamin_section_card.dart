@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/enums/vitamin_enums.dart';
 import '../../models/session.dart';
 import '../../models/vitamin_entry.dart';
 import '../../providers/session_provider.dart';
@@ -55,7 +56,7 @@ class VitaminSectionCard extends StatelessWidget {
                   return ExpandableEntryListItem(
                     data: entry,
                     summaryText: (data) =>
-                        '${data.value.type.label} at ${_formatTime(data.value.time)}${data.value.notes?.isNotEmpty == true ? ' - ${data.value.notes}' : ''}',
+                        '${data.value.type?.label ?? 'Not set'} at ${_formatTime(data.value.time)}${data.value.notes?.isNotEmpty == true ? ' - ${data.value.notes}' : ''}',
                     builder: (data, isExpanded) => _VitaminEntryItem(
                       entry: data.value,
                       session: session,
@@ -85,6 +86,7 @@ class VitaminSectionCard extends StatelessWidget {
                     ),
                   );
                 }).toList(),
+                shouldExpand: (data) => !data.value.isComplete,
               ),
           ],
         ),
@@ -99,6 +101,18 @@ class VitaminSectionCard extends StatelessWidget {
   Future<void> _addNewVitaminEntry(BuildContext context) async {
     if (session.id == null) return;
 
+    // Check if all existing vitamin entries are complete
+    final incompleteEntries = session.vitaminEntries.where((entry) => !entry.isComplete).toList();
+    if (incompleteEntries.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please complete all existing vitamin entries before adding a new one'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     if (!session.isClosed) {
       // In session screen - persist immediately through provider
       final provider = context.read<SessionProvider>();
@@ -106,7 +120,6 @@ class VitaminSectionCard extends StatelessWidget {
         sessionId: session.id!,
         time: await getValidEntryTime(
             session: session, time: truncateToMinute(DateTime.now()), context: context),
-        type: VitaminType.ad, // Default to AD as requested
       );
     } else {
       // In edit screen - keep in memory only
@@ -114,7 +127,6 @@ class VitaminSectionCard extends StatelessWidget {
         sessionId: session.id!,
         time: await getValidEntryTime(
             session: session, time: truncateToMinute(DateTime.now()), context: context),
-        type: VitaminType.ad, // Default to AD as requested
       );
       onSessionChanged(session.copyWith(
         vitaminEntries: List.of(session.vitaminEntries)..add(newEntry),
