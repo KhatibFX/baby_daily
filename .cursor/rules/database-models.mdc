@@ -1,0 +1,64 @@
+---
+alwaysApply: true
+---
+
+# Database & Models Architecture
+
+## Core Model Structure
+
+The app revolves around **Sessions** that represent a baby's wake-to-sleep cycle.
+
+### Session Model ([session.dart](mdc:lib/models/session.dart))
+
+- **Primary Key**: Auto-incrementing integer ID
+- **Time Tracking**: `wakeUpTime` (required), `sleepTime` (optional until session closed)
+- **Entry Collections**: Lists of pee, poop, milk, and vitamin entries
+- **State**: `isClosed` boolean to track if session is active
+- **Photo**: Optional session photo with path tracking
+
+### Entry Models Pattern
+
+All entry models follow consistent patterns:
+- **Base Properties**: `id`, `sessionId`, `time`
+- **JSON Serialization**: `toJson()` and `fromJson()` methods
+- **Database Mapping**: `toMap()` and `fromMap()` methods
+- **Immutability**: `copyWith()` methods for updates
+
+### Database Schema
+
+- **SQLite Database**: Named `baby_daily.db`
+- **Version**: Currently version 6 with migration support
+- **Tables**: 
+  - `sessions` - Core session data
+  - `pee_entries`, `poop_entries`, `milk_entries`, `vitamin_entries` - Related entries
+- **Foreign Keys**: All entries reference `sessions.id`
+
+## Database Operations
+
+### Service Pattern ([database_service.dart](mdc:lib/services/database_service.dart))
+
+- **Singleton Pattern**: `DatabaseService.instance`
+- **Migration Support**: Handle schema upgrades gracefully
+- **CRUD Operations**: Create, Read, Update, Delete for all models
+- **Transactions**: Use database transactions for related operations
+
+### Data Relationships
+
+- **One-to-Many**: Session → Multiple entries of each type
+- **Cascade Operations**: When session deleted, all related entries deleted
+- **Time Ordering**: Entries maintain chronological order within sessions
+
+## Enums and Constants
+
+### Tracking Enums
+- `PeeAmount`: na, small, medium, large, xlarge
+- `PoopAmount`: na, small, medium, large, blowout  
+- `PoopConsistency`: normal, dry, liquid, diarrhea
+- `PoopColor`: green, yellow, yellowGreen, abnormal
+
+## Data Validation
+
+- **Required Fields**: Validate presence of required data
+- **Time Constraints**: Ensure logical time ordering
+- **Enum Values**: Validate enum selections
+- **Photo Paths**: Verify file existence for photo references

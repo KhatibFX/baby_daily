@@ -1,0 +1,50 @@
+---
+alwaysApply: true
+---
+
+# Baby Daily Project Structure Guide
+
+This is a Flutter baby daily tracking app that helps parents track their baby's routine through sessions (wake up to sleep cycles).
+
+## Core Architecture
+
+- **Entry Point**: [main.dart](mdc:lib/main.dart) - Sets up providers and navigation
+- **Models**: Located in [lib/models/](mdc:lib/models/)
+  - [session.dart](mdc:lib/models/session.dart) - Main session model with all baby activities
+  - [milk_entry.dart](mdc:lib/models/milk_entry.dart) - Milk feeding tracking
+  - [pee_entry.dart](mdc:lib/models/pee_entry.dart) - Pee activities
+  - [poop_entry.dart](mdc:lib/models/poop_entry.dart) - Poop activities with consistency/color tracking
+  - [vitamin_entry.dart](mdc:lib/models/vitamin_entry.dart) - Vitamin tracking
+
+## State Management
+
+- **Providers**: Located in [lib/providers/](mdc:lib/providers/)
+  - [session_provider.dart](mdc:lib/providers/session_provider.dart) - Main session state management
+  - [edit_session_provider.dart](mdc:lib/providers/edit_session_provider.dart) - Edit session state
+
+## UI Structure
+
+- **Screens**: Located in [lib/screens/](mdc:lib/screens/)
+  - [session_screen.dart](mdc:lib/screens/session_screen.dart) - Current active session
+  - [session_history_screen.dart](mdc:lib/screens/session_history_screen.dart) - Past sessions
+  - [analytics_screen.dart](mdc:lib/screens/analytics_screen.dart) - Data visualization
+  - [settings_screen.dart](mdc:lib/screens/settings_screen.dart) - App settings
+  - [edit_session_screen.dart](mdc:lib/screens/edit_session_screen.dart) - Edit existing sessions
+
+- **Shared Widgets**: Located in [lib/shared/widgets/](mdc:lib/shared/widgets/)
+  - Reusable components for different entry types
+  - Common UI patterns and utilities
+
+## Services
+
+- **Database**: [database_service.dart](mdc:lib/services/database_service.dart) - SQLite operations
+- **Backup**: [backup_service.dart](mdc:lib/services/backup_service.dart) - Data backup/restore
+- **Excel**: [excel_service.dart](mdc:lib/services/excel_service.dart) - Export functionality
+
+## Key Dependencies
+
+- `provider` - State management
+- `sqflite` - Local database
+- `image_picker` - Photo capture
+- `excel` - Data export
+- `intl` - Date/time formatting

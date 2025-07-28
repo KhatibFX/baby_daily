@@ -1,0 +1,74 @@
+---
+alwaysApply: true
+---
+
+# Provider Pattern & State Management
+
+## Provider Architecture
+
+The app uses Provider pattern with ChangeNotifier for state management.
+
+### Main Providers
+
+#### SessionProvider ([session_provider.dart](mdc:lib/providers/session_provider.dart))
+- **Purpose**: Manages current session and session history
+- **Key State**: 
+  - `_currentSession` - Active session or null
+  - `_sessions` - List of all sessions
+  - `_lastSleepTime` - Used for analytics
+- **Key Methods**:
+  - `loadSessions()` - Initialize from database
+  - `startNewSession()` - Create new session
+  - `closeCurrentSession()` - End active session
+  - Entry management (add/remove/update entries)
+
+#### EditSessionProvider ([edit_session_provider.dart](mdc:lib/providers/edit_session_provider.dart))
+- **Purpose**: Handles editing of existing sessions
+- **Isolation**: Separate from main provider to avoid conflicts
+- **Pattern**: Load → Edit → Save/Discard workflow
+
+## Provider Usage Patterns
+
+### Widget Integration
+```dart
+// Access provider
+final provider = Provider.of<SessionProvider>(context);
+
+// Listen to changes
+Consumer<SessionProvider>(
+  builder: (context, provider, child) {
+    return SomeWidget(data: provider.currentSession);
+  },
+);
+
+// One-time access without listening
+final provider = Provider.of<SessionProvider>(context, listen: false);
+```
+
+### State Updates
+- **Always call `notifyListeners()`** after state changes
+- **Use async/await** for database operations
+- **Handle errors gracefully** and notify users
+- **Batch related operations** to minimize rebuilds
+
+## Data Flow
+
+1. **User Action** → Provider method called
+2. **Database Operation** → Update local state
+3. **Notify Listeners** → UI rebuilds automatically
+4. **Error Handling** → Show user feedback
+
+## Provider Setup ([main.dart](mdc:lib/main.dart))
+
+MultiProvider configuration with:
+- SessionProvider initialized with `loadSessions()`
+- EditSessionProvider for session editing
+- Providers available throughout widget tree
+
+## Best Practices
+
+- **Separate Concerns**: Different providers for different features
+- **Minimal State**: Keep only necessary data in providers
+- **Immutable Updates**: Use copyWith() for model changes
+- **Error States**: Provide loading and error states where needed
+- **Testing**: Make providers testable with mock dependencies

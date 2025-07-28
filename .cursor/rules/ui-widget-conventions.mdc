@@ -1,0 +1,85 @@
+---
+alwaysApply: true
+---
+
+# UI & Widget Conventions
+
+## Material Design 3 Standards
+
+- **Theme**: Uses Material 3 with blue seed color
+- **Color Scheme**: Access via `Theme.of(context).colorScheme`
+- **Components**: Use Material 3 components (Cards, AppBar, etc.)
+
+## Navigation Structure
+
+### Bottom Navigation ([main.dart](mdc:lib/main.dart))
+- **Fixed Type**: 4 tabs with `BottomNavigationBarType.fixed`
+- **Screens**: Session, History, Analytics, Settings
+- **Icons**: Material icons with semantic meaning
+- **State**: Managed in main widget state
+
+### Screen Architecture
+- **AppBar**: Dynamic title based on current tab
+- **Body**: Screen-specific content
+- **Consistent**: Same navigation pattern across all screens
+
+## Widget Organization
+
+### Shared Widgets ([lib/shared/widgets/](mdc:lib/shared/widgets/))
+
+#### Entry Widgets
+- `milk_section_card.dart` - Milk entry display and interaction
+- `pee_section_card.dart` - Pee entry tracking
+- `poop_section_card.dart` - Poop entry with detailed options
+- `vitamin_section_card.dart` - Vitamin tracking
+- `time_section_cards.dart` - Wake up and sleep time controls
+
+#### Common Components  
+- `expandable_entry_list.dart` - Collapsible entry lists
+- `session_actions_bar.dart` - Action buttons for sessions
+- `session_photo_card.dart` - Photo display and capture
+- `discard_changes_dialog.dart` - Confirmation dialog
+
+### Widget Patterns
+
+#### Card-Based Layout
+- **Consistent**: All major sections use Card widgets
+- **Padding**: Standard padding using Material spacing
+- **Elevation**: Subtle elevation for depth
+- **Border Radius**: Consistent rounded corners
+
+#### Form Controls
+- **Time Pickers**: Use Material time picker
+- **Dropdowns**: For enum selections (amount, consistency, etc.)
+- **Buttons**: Material buttons with proper states
+- **Icons**: Semantic icons for actions
+
+## Responsive Design
+
+- **Layout**: Adapts to different screen sizes
+- **Spacing**: Uses MediaQuery for responsive spacing
+- **Touch Targets**: Minimum 48dp touch targets
+- **Accessibility**: Semantic labels and proper contrast
+
+## Photo Handling
+
+- **Image Picker**: Uses `image_picker` package
+- **Storage**: Photos stored in app's support directory
+- **Display**: Proper aspect ratio and loading states
+- **Fallback**: Graceful handling of missing photos
+
+## Analytics Widgets ([lib/screens/analytics/widgets/](mdc:lib/screens/analytics/widgets/))
+
+- **Stat Cards**: Consistent data presentation
+- **Charts**: Visual data representation
+- **Details**: Expandable detail views
+- **Filtering**: Time-based data filtering
+
+## Best Practices
+
+- **Composition**: Break complex widgets into smaller parts
+- **Reusability**: Create reusable components in shared/
+- **Performance**: Use const constructors where possible
+- **Accessibility**: Include semantic labels and proper focus
+- **Loading States**: Show loading indicators for async operations
+- **Error States**: Graceful error display and recovery options

@@ -1,0 +1,45 @@
+---
+alwaysApply: true
+---
+
+# Coding Conventions & Standards
+
+## Flutter/Dart Conventions
+
+- **File Naming**: Use snake_case for file names (e.g., `session_provider.dart`)
+- **Class Naming**: Use PascalCase for class names (e.g., `SessionProvider`)
+- **Variable Naming**: Use camelCase for variables and methods (e.g., `currentSession`)
+- **Constants**: Use SCREAMING_SNAKE_CASE for constants
+
+## Code Organization
+
+- **Imports**: Group imports with Flutter/Dart first, then third-party, then local imports
+- **Constructor**: Named parameters with `required` keyword where appropriate
+- **Methods**: Keep methods focused and under 50 lines when possible
+- **Comments**: Use `///` for documentation comments, `//` for inline comments
+
+## State Management Patterns
+
+- **Provider Pattern**: All state management uses Provider with ChangeNotifier
+- **Immutability**: Use `copyWith()` methods for model updates
+- **Async Operations**: Always handle errors and loading states
+- **Database Operations**: Always use try-catch blocks
+
+## Widget Architecture
+
+- **Stateless vs Stateful**: Prefer StatelessWidget when possible
+- **Widget Composition**: Break down complex widgets into smaller components
+- **Material 3**: Use Material 3 design system (`useMaterial3: true`)
+- **Theme**: Use theme colors from `Theme.of(context).colorScheme`
+
+## Error Handling
+
+- **Database Errors**: Always wrap database operations in try-catch
+- **User Feedback**: Show snackbars or dialogs for user-facing errors
+- **Logging**: Use `print()` for development, consider proper logging for production
+
+## Testing Considerations
+
+- **Testable Code**: Write code that can be easily unit tested
+- **Mock Data**: Provide factory constructors for testing
+- **Separation of Concerns**: Keep business logic separate from UI code
