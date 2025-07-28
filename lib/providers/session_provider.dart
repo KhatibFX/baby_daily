@@ -195,10 +195,6 @@ class SessionProvider with ChangeNotifier {
     return true; // Return true to indicate success
   }
 
-  Future<List<Session>> getSessionsInRange(DateTime start, DateTime end) async {
-    return await _db.getSessionsInRange(start, end);
-  }
-
   Future<void> updateSession(Session session) async {
     if (session.id != null) {
       // For existing sessions, always use update
@@ -238,9 +234,35 @@ class SessionProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<List<Session>> getClosedSessionsInRange(DateTime start, DateTime end) async {
-    final sessions = await _db.getSessionsInRange(start, end);
-    return sessions.where((s) => s.isClosed).toList();
+  /// Gets all sessions for analytics that overlap with the date range
+  ///
+  /// Session Selection Logic:
+  /// - sleepTime is after the start time OR sleepTime is null (open session)
+  /// - wakeUpTime is before the end time
+  ///
+  /// Entry Filtering:
+  /// - Only includes entries where entry.time >= start AND entry.time < end
+  /// - This allows analytics to include data from open sessions when entries fall within range
+  Future<List<Session>> getSessionsForAnalytics(DateTime start, DateTime end) async {
+    final sessions = await _db.getSessionsForAnalytics(start, end);
+
+    // Filter entries within each session to only include those within the date range [start, end)
+    return sessions.map((session) {
+      return session.copyWith(
+        peeEntries: session.peeEntries
+            .where((entry) => !entry.time.isBefore(start) && entry.time.isBefore(end))
+            .toList(),
+        poopEntries: session.poopEntries
+            .where((entry) => !entry.time.isBefore(start) && entry.time.isBefore(end))
+            .toList(),
+        milkEntries: session.milkEntries
+            .where((entry) => !entry.time.isBefore(start) && entry.time.isBefore(end))
+            .toList(),
+        vitaminEntries: session.vitaminEntries
+            .where((entry) => !entry.time.isBefore(start) && entry.time.isBefore(end))
+            .toList(),
+      );
+    }).toList();
   }
 
   Future<String?> takePoopPhoto() async {

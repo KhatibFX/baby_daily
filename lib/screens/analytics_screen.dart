@@ -46,7 +46,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   Future<void> _loadSessions() async {
     final provider = Provider.of<SessionProvider>(context, listen: false);
-    final sessions = await provider.getClosedSessionsInRange(_startDate, _endDate);
+    final sessions = await provider.getSessionsForAnalytics(_startDate, _endDate);
     setState(() {
       _sessions = sessions;
     });

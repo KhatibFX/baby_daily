@@ -504,11 +504,15 @@ class DatabaseService {
     return sessionsWithEntries;
   }
 
-  Future<List<Session>> getSessionsInRange(DateTime start, DateTime end) async {
+  /// Gets all sessions that overlap with the date range for analytics
+  /// Includes sessions where:
+  /// - sleepTime is after the start time OR sleepTime is null (open session)
+  /// - wakeUpTime is before the end time
+  Future<List<Session>> getSessionsForAnalytics(DateTime start, DateTime end) async {
     final db = await instance.database;
     final result = await db.query(
       'sessions',
-      where: 'wakeUpTime BETWEEN ? AND ?',
+      where: '(sleepTime IS NULL OR sleepTime > ?) AND wakeUpTime < ?',
       whereArgs: [start.toIso8601String(), end.toIso8601String()],
       orderBy: 'wakeUpTime DESC',
     );
