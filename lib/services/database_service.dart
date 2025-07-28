@@ -28,7 +28,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 9, // Upgraded version for converting enums to text
+      version: 10, // Upgraded version for setting null vitamin types to AD
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -469,6 +469,14 @@ class DatabaseService {
 
         await txn.execute('DROP TABLE poop_entries_old');
       });
+    }
+    if (oldVersion < 10) {
+      // Set null vitamin entry types to 'ad'
+      await db.execute('''
+        UPDATE vitamin_entries 
+        SET type = 'ad'
+        WHERE type IS NULL
+      ''');
     }
   }
 
