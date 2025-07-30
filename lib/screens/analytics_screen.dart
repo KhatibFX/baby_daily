@@ -184,8 +184,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     ),
                   ),
                   child: IconButton(
-                    iconSize: 24, // default size
-                    icon: const Icon(Icons.arrow_left),
+                    iconSize: 56,
+                    padding: EdgeInsets.zero,
+                    icon: Transform.scale(
+                      scale: 1.8, // Scale up to fill the entire button area
+                      child: Icon(
+                        Icons.arrow_left_rounded,
+                        color: Theme.of(context).colorScheme.inversePrimary,
+                      ),
+                    ),
                     onPressed: _decrementDateRange,
                     splashRadius: 28,
                   ),
@@ -225,8 +232,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     ),
                   ),
                   child: IconButton(
-                    iconSize: 24, // default size
-                    icon: const Icon(Icons.arrow_right),
+                    iconSize: 56,
+                    padding: EdgeInsets.zero,
+                    icon: Transform.scale(
+                      scale: 1.8, // Scale up to fill the entire button area
+                      child: Icon(
+                        Icons.arrow_right_rounded,
+                        color: Theme.of(context).colorScheme.inversePrimary,
+                      ),
+                    ),
                     onPressed: _incrementDateRange,
                     splashRadius: 28,
                   ),

@@ -24,15 +24,11 @@ class SessionScreen extends StatelessWidget {
               width: MediaQuery.of(context).size.shortestSide * 0.5,
               height: MediaQuery.of(context).size.shortestSide * 0.5,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF4FC3F7), Color(0xFF7C4DFF)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: Theme.of(context).colorScheme.inversePrimary,
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF7C4DFF).withOpacity(0.18),
+                    color: Theme.of(context).colorScheme.inversePrimary.withOpacity(0.18),
                     blurRadius: 18,
                     offset: const Offset(0, 6),
                   ),
@@ -96,7 +92,8 @@ class SessionScreen extends StatelessWidget {
                       if (incompleteTypes.isNotEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('Please complete all entries before closing the session. Incomplete: ${incompleteTypes.join(', ')}'),
+                            content: Text(
+                                'Please complete all entries before closing the session. Incomplete: ${incompleteTypes.join(', ')}'),
                             backgroundColor: Colors.red,
                             duration: Duration(seconds: 4),
                           ),
