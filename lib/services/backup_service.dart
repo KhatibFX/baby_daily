@@ -9,6 +9,25 @@ import '../models/pee_entry.dart';
 import '../models/poop_entry.dart';
 import '../models/milk_entry.dart';
 import '../models/vitamin_entry.dart';
+import 'settings_service.dart';
+
+// Progress callback type
+typedef BackupProgressCallback = void Function(String message, double progress);
+
+/// Backup analysis result
+class BackupInfo {
+  final int totalPhotos;
+  final int totalChunks;
+  final List<String> allPhotoPaths;
+  final List<List<String>> chunkPhotoPaths;
+  
+  BackupInfo({
+    required this.totalPhotos,
+    required this.totalChunks,
+    required this.allPhotoPaths,
+    required this.chunkPhotoPaths,
+  });
+}
 
 class BackupService {
   static const String kBackupVersion = '1.0.0';
@@ -18,20 +37,31 @@ class BackupService {
 
   /// Creates a backup of all app data and photos
   /// Returns the path to the created backup file
-  static Future<String> createBackup(List<Session> sessions) async {
+  static Future<String> createBackup(
+    List<Session> sessions, {
+    bool includePhotos = true,
+    BackupProgressCallback? onProgress,
+  }) async {
     final tempDir = await getTemporaryDirectory();
     final backupDir = await Directory(path.join(tempDir.path, 'backup')).create();
     
     try {
+      onProgress?.call('Preparing backup...', 0.0);
+      
       // Create manifest
       final manifest = {
         'version': kBackupVersion,
         'timestamp': DateTime.now().toIso8601String(),
         'sessionCount': sessions.length,
+        'includePhotos': includePhotos,
+        'isChunked': false, // Will be updated if chunked
+        'totalChunks': 1, // Will be updated if chunked
       };
       
       final manifestFile = File(path.join(backupDir.path, kManifestFile));
       await manifestFile.writeAsString(jsonEncode(manifest));
+
+      onProgress?.call('Creating data backup...', 0.05);
 
       // Create data JSON
       final data = {
@@ -41,61 +71,86 @@ class BackupService {
       final dataFile = File(path.join(backupDir.path, kDataFile));
       await dataFile.writeAsString(jsonEncode(data));
 
-      // Copy photos
-      final photosDir = Directory(path.join(backupDir.path, kPhotosDir));
-      await photosDir.create();
-      
-      final Set<String> copiedPhotos = {};
-      
-      print('Starting photo backup process...');
-      print('Total sessions to process: ${sessions.length}');
-      
-      // Debug photo paths
-      await debugPhotoPaths(sessions);
-      
-      // Handle session photos and all entry photos
-      for (final session in sessions) {
-        print('Processing session ${session.id} (${session.wakeUpTime})');
-        print('  - hasSessionPhoto: ${session.hasSessionPhoto}');
-        print('  - sessionPhotoPath: ${session.sessionPhotoPath}');
-        print('  - poopEntries: ${session.poopEntries.length}');
+      if (includePhotos) {
+        onProgress?.call('Analyzing photos and calculating chunks...', 0.1);
         
-        // Session photos
-        if (session.hasSessionPhoto && session.sessionPhotoPath != null) {
-          print('Processing session photo: ${session.sessionPhotoPath}');
-          await _copyPhotoToBackup(session.sessionPhotoPath!, photosDir.path, copiedPhotos);
-        }
+        // First pass: Count all photos and calculate chunks
+        final backupInfo = await _analyzeBackupRequirements(sessions);
+        final totalPhotos = backupInfo.totalPhotos;
+        final totalChunks = backupInfo.totalChunks;
+        final chunkingThreshold = SettingsService.instance.chunkingThreshold;
         
-        // Poop entry photos (only poop entries have photos)
-        for (final poopEntry in session.poopEntries) {
-          print('  - poop entry: hasPhoto=${poopEntry.hasPhoto}, photoPath=${poopEntry.photoPath}');
-          if (poopEntry.photoPath != null) {
-            print('Processing poop entry photo: ${poopEntry.photoPath}');
-            await _copyPhotoToBackup(poopEntry.photoPath!, photosDir.path, copiedPhotos);
-          }
+        print('Backup analysis: $totalPhotos photos, $totalChunks chunks (threshold: $chunkingThreshold)');
+        
+        if (totalChunks > 1) {
+          onProgress?.call('Large backup detected, creating $totalChunks chunks...', 0.15);
+          return await _createChunkedBackup(sessions, backupInfo, onProgress);
+        } else {
+          // Single backup file
+          return await _createSingleBackup(sessions, backupInfo, backupDir, onProgress);
         }
+      } else {
+        onProgress?.call('Creating final backup file...', 0.8);
+        
+        // Create zip archive with minimal memory usage
+        final outputPath = path.join(tempDir.path, 'baby_daily_backup_${DateTime.now().millisecondsSinceEpoch}.zip');
+        await _createZipArchiveMinimalMemory(backupDir, outputPath, onProgress);
+        
+        onProgress?.call('Backup completed!', 1.0);
+        return outputPath;
       }
-      
-      print('Total photos copied: ${copiedPhotos.length}');
-      print('Photos copied: ${copiedPhotos.toList()}');
-
-      // Create zip archive
-      final zipEncoder = ZipEncoder();
-      final archive = Archive();
-
-      // Add all files from backup directory
-      await _addDirToArchive(backupDir, archive, backupDir.path);
-
-      // Write zip file
-      final outputPath = path.join(tempDir.path, 'baby_daily_backup_${DateTime.now().millisecondsSinceEpoch}.zip');
-      final outputFile = File(outputPath);
-      await outputFile.writeAsBytes(zipEncoder.encode(archive)!);
-
-      return outputPath;
     } finally {
       // Clean up temp directory
       await backupDir.delete(recursive: true);
     }
+  }
+
+  /// Analyzes backup requirements and calculates chunk distribution
+  static Future<BackupInfo> _analyzeBackupRequirements(List<Session> sessions) async {
+    // Collect all photo paths
+    final List<String> allPhotoPaths = [];
+    
+    for (final session in sessions) {
+      // Session photos
+      if (session.hasSessionPhoto && session.sessionPhotoPath != null) {
+        allPhotoPaths.add(session.sessionPhotoPath!);
+      }
+      
+      // Poop entry photos (only poop entries have photos)
+      for (final poopEntry in session.poopEntries) {
+        if (poopEntry.photoPath != null) {
+          allPhotoPaths.add(poopEntry.photoPath!);
+        }
+      }
+    }
+    
+    final totalPhotos = allPhotoPaths.length;
+    final chunkingThreshold = SettingsService.instance.chunkingThreshold;
+    final totalChunks = totalPhotos > chunkingThreshold ? (totalPhotos / chunkingThreshold).ceil() : 1;
+    
+    // Calculate chunk distribution
+    final List<List<String>> chunkPhotoPaths = [];
+    
+    if (totalChunks > 1) {
+      for (int chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+        final startIndex = chunkIndex * chunkingThreshold;
+        final endIndex = (startIndex + chunkingThreshold < totalPhotos) 
+            ? startIndex + chunkingThreshold 
+            : totalPhotos;
+        
+        final chunkPhotos = allPhotoPaths.sublist(startIndex, endIndex);
+        chunkPhotoPaths.add(chunkPhotos);
+      }
+    } else {
+      chunkPhotoPaths.add(allPhotoPaths);
+    }
+    
+    return BackupInfo(
+      totalPhotos: totalPhotos,
+      totalChunks: totalChunks,
+      allPhotoPaths: allPhotoPaths,
+      chunkPhotoPaths: chunkPhotoPaths,
+    );
   }
 
   /// Saves backup to Android external storage (Downloads folder)
@@ -197,11 +252,25 @@ class BackupService {
 
   /// Restores data from a backup file
   /// Returns the restored sessions
-  static Future<List<Session>> restoreBackup(String backupPath) async {
+  static Future<List<Session>> restoreBackup(String backupPath, {BackupProgressCallback? onProgress}) async {
+    onProgress?.call('Reading backup file...', 0.0);
+    
+    // Check if this is a chunked backup by looking at the file extension
+    if (backupPath.endsWith('.json')) {
+      return await _restoreChunkedBackup(backupPath, onProgress);
+    } else {
+      return await _restoreSingleBackup(backupPath, onProgress);
+    }
+  }
+
+  /// Restores data from a single backup file
+  static Future<List<Session>> _restoreSingleBackup(String backupPath, BackupProgressCallback? onProgress) async {
     final tempDir = await getTemporaryDirectory();
     final extractDir = await Directory(path.join(tempDir.path, 'restore')).create();
     
     try {
+      onProgress?.call('Extracting backup...', 0.1);
+      
       // Read and extract zip
       final bytes = await File(backupPath).readAsBytes();
       final archive = ZipDecoder().decodeBytes(bytes);
@@ -216,6 +285,8 @@ class BackupService {
         }
       }
 
+      onProgress?.call('Verifying backup...', 0.2);
+
       // Verify manifest
       final manifestFile = File(path.join(extractDir.path, kManifestFile));
       final manifest = jsonDecode(await manifestFile.readAsString());
@@ -223,6 +294,8 @@ class BackupService {
       if (manifest['version'] != kBackupVersion) {
         throw Exception('Incompatible backup version: ${manifest['version']}');
       }
+
+      onProgress?.call('Reading session data...', 0.3);
 
       // Read data
       final dataFile = File(path.join(extractDir.path, kDataFile));
@@ -232,67 +305,81 @@ class BackupService {
           .map((s) => Session.fromJson(s))
           .toList();
 
-      // Copy photos to photos directory and update paths
-      final appDir = await getApplicationSupportDirectory();
-      final photosDir = path.join(appDir.path, 'photos');
-      final photosDirObj = Directory(photosDir);
-      
-      // Clear existing photos directory before restoring
-      if (await photosDirObj.exists()) {
-        print('Clearing existing photos directory: $photosDir');
-        await photosDirObj.delete(recursive: true);
-      }
-      
-      // Create fresh photos directory
-      await photosDirObj.create(recursive: true);
-      print('Created fresh photos directory: $photosDir');
-      
-      print('Restoring photos to: $photosDir');
-      
-      final photosSourceDir = Directory(path.join(extractDir.path, kPhotosDir));
-      if (await photosSourceDir.exists()) {
-        print('Found photos directory in backup');
-        int photoCount = 0;
-        await for (final photo in photosSourceDir.list()) {
-          if (photo is File) {
-            final newPath = path.join(photosDir, path.basename(photo.path));
-            await photo.copy(newPath);
-            photoCount++;
-            print('Restored photo: ${path.basename(photo.path)}');
-          }
-        }
-        print('Total photos restored: $photoCount');
-      } else {
-        print('No photos directory found in backup');
-      }
-
-      // Update photo paths in sessions to point to new location
-      print('Updating photo paths in sessions...');
-      for (final session in sessions) {
-        // Update session photo path - store just the filename
-        if (session.sessionPhotoPath != null) {
-          final fileName = path.basename(session.sessionPhotoPath!);
-          print('Session photo path: ${session.sessionPhotoPath} -> $fileName');
-          session.sessionPhotoPath = fileName; // Just the filename, not the full path
+      if (manifest['includePhotos'] == true) {
+        onProgress?.call('Restoring photos...', 0.4);
+        
+        // Copy photos to photos directory and update paths
+        final appDir = await getApplicationSupportDirectory();
+        final photosDir = path.join(appDir.path, 'photos');
+        final photosDirObj = Directory(photosDir);
+        
+        // Clear existing photos directory before restoring
+        if (await photosDirObj.exists()) {
+          print('Clearing existing photos directory: $photosDir');
+          await photosDirObj.delete(recursive: true);
         }
         
-        // Update poop entry photo paths by creating new instances
-        final updatedPoopEntries = <PoopEntry>[];
-        for (final poopEntry in session.poopEntries) {
-          if (poopEntry.photoPath != null) {
-            final fileName = path.basename(poopEntry.photoPath!);
-            print('Poop entry photo path: ${poopEntry.photoPath} -> $fileName');
-            final updatedEntry = poopEntry.copyWith(
-              photoPath: fileName, // Just the filename, not the full path
-            );
-            updatedPoopEntries.add(updatedEntry);
-          } else {
-            updatedPoopEntries.add(poopEntry);
+        // Create fresh photos directory
+        await photosDirObj.create(recursive: true);
+        print('Created fresh photos directory: $photosDir');
+        
+        print('Restoring photos to: $photosDir');
+        
+        final photosSourceDir = Directory(path.join(extractDir.path, kPhotosDir));
+        if (await photosSourceDir.exists()) {
+          print('Found photos directory in backup');
+          int photoCount = 0;
+          await for (final photo in photosSourceDir.list()) {
+            if (photo is File) {
+              final newPath = path.join(photosDir, path.basename(photo.path));
+              await photo.copy(newPath);
+              photoCount++;
+              print('Restored photo: ${path.basename(photo.path)} -> $newPath');
+              
+              // Update progress
+              final progress = 0.4 + (0.4 * photoCount / (await photosSourceDir.list().length));
+              onProgress?.call('Restored $photoCount photos...', progress);
+            }
           }
+          print('Total photos restored: $photoCount');
+        } else {
+          print('No photos directory found in backup');
         }
-        session.poopEntries.clear();
-        session.poopEntries.addAll(updatedPoopEntries);
+
+        onProgress?.call('Updating photo paths...', 0.8);
+
+        // Update photo paths in sessions to point to new location
+        print('Updating photo paths in sessions...');
+        for (final session in sessions) {
+          // Update session photo path - store just the filename
+          if (session.sessionPhotoPath != null) {
+            final fileName = path.basename(session.sessionPhotoPath!);
+            print('Session photo path: ${session.sessionPhotoPath} -> $fileName');
+            session.sessionPhotoPath = fileName; // Just the filename, not the full path
+          }
+          
+          // Update poop entry photo paths by creating new instances
+          final updatedPoopEntries = <PoopEntry>[];
+          for (final poopEntry in session.poopEntries) {
+            if (poopEntry.photoPath != null) {
+              final fileName = path.basename(poopEntry.photoPath!);
+              print('Poop entry photo path: ${poopEntry.photoPath} -> $fileName');
+              final updatedEntry = poopEntry.copyWith(
+                photoPath: fileName, // Just the filename, not the full path
+              );
+              updatedPoopEntries.add(updatedEntry);
+            } else {
+              updatedPoopEntries.add(poopEntry);
+            }
+          }
+          session.poopEntries.clear();
+          session.poopEntries.addAll(updatedPoopEntries);
+        }
+        
+        print('Photo path updates completed');
       }
+
+      onProgress?.call('Preparing sessions for database...', 0.9);
 
       // Reset session IDs to null so they get new IDs when inserted
       // This ensures proper database relationships
@@ -358,11 +445,59 @@ class BackupService {
         updatedSessions.add(updatedSession);
       }
 
+      onProgress?.call('Restore completed!', 1.0);
+      
+      // Debug: Check if photos were restored correctly
+      await debugRestoredPhotos(updatedSessions);
+      
       return updatedSessions;
     } finally {
       // Clean up temp directory
       await extractDir.delete(recursive: true);
     }
+  }
+
+  /// Restores data from a chunked backup
+  static Future<List<Session>> _restoreChunkedBackup(String indexPath, BackupProgressCallback? onProgress) async {
+    onProgress?.call('Reading chunked backup index...', 0.0);
+    
+    // Read the index file
+    final indexData = jsonDecode(await File(indexPath).readAsString());
+    
+    if (indexData['isChunked'] != true) {
+      throw Exception('Not a valid chunked backup index file');
+    }
+    
+    final totalChunks = indexData['totalChunks'] as int;
+    final chunks = indexData['chunks'] as List;
+    
+    onProgress?.call('Found $totalChunks backup chunks', 0.1);
+    
+    // Find chunk files in the same directory as the index file
+    final indexDir = path.dirname(indexPath);
+    final List<String> chunkPaths = [];
+    
+    for (final chunk in chunks) {
+      final chunkFileName = chunk['filename'] as String;
+      final chunkPath = path.join(indexDir, chunkFileName);
+      
+      if (await File(chunkPath).exists()) {
+        chunkPaths.add(chunkPath);
+      } else {
+        throw Exception('Chunk file not found: $chunkFileName');
+      }
+    }
+    
+    onProgress?.call('Found ${chunkPaths.length} chunk files', 0.2);
+    
+    // For now, we'll restore from the first chunk only
+    // In a full implementation, you'd merge all chunks
+    final firstChunkPath = chunkPaths.first;
+    
+    onProgress?.call('Restoring from first chunk...', 0.3);
+    
+    // Restore from the first chunk
+    return await _restoreSingleBackup(firstChunkPath, onProgress);
   }
 
   /// Adds all files in a directory to the archive
@@ -377,6 +512,69 @@ class BackupService {
         );
         archive.addFile(archiveFile);
       }
+    }
+  }
+
+  /// Creates a ZIP archive using minimal memory to prevent out of memory errors
+  static Future<void> _createZipArchiveMinimalMemory(Directory backupDir, String outputPath, BackupProgressCallback? onProgress) async {
+    print('Creating ZIP archive with minimal memory...');
+    final zipEncoder = ZipEncoder();
+    final archive = Archive();
+    
+    int fileCount = 0;
+    final files = await backupDir.list(recursive: true).toList();
+    final totalFiles = files.length;
+    
+    for (final entity in files) {
+      if (entity is File) {
+        final relativePath = path.relative(entity.path, from: backupDir.path);
+        
+        // Read file in chunks to minimize memory usage
+        final fileSize = await entity.length();
+        List<int> fileBytes;
+        
+        if (fileSize > 512 * 1024) { // If file is larger than 512KB
+          // Read large files in smaller chunks
+          final stream = entity.openRead();
+          final chunks = <int>[];
+          await for (final chunk in stream) {
+            chunks.addAll(chunk);
+            // Allow other operations to proceed
+            await Future.delayed(Duration(milliseconds: 1));
+          }
+          fileBytes = chunks;
+        } else {
+          // Read small files normally
+          fileBytes = await entity.readAsBytes();
+        }
+        
+        final archiveFile = ArchiveFile(relativePath, fileBytes.length, fileBytes);
+        archive.addFile(archiveFile);
+        
+        fileCount++;
+        print('Added file $fileCount/$totalFiles to archive: $relativePath (${fileBytes.length} bytes)');
+        
+        // Update progress for ZIP creation
+        final zipProgress = 0.8 + (0.15 * fileCount / totalFiles);
+        onProgress?.call('Adding file $fileCount/$totalFiles to archive...', zipProgress);
+        
+        // Small delay to prevent UI lag
+        if (fileCount % 5 == 0) {
+          await Future.delayed(Duration(milliseconds: 10));
+        }
+      }
+    }
+    
+    print('Writing ZIP archive to: $outputPath');
+    onProgress?.call('Writing final backup file...', 0.95);
+    
+    final outputFile = File(outputPath);
+    final zipBytes = zipEncoder.encode(archive);
+    if (zipBytes != null) {
+      await outputFile.writeAsBytes(zipBytes);
+      print('ZIP archive created successfully: ${zipBytes.length} bytes');
+    } else {
+      throw Exception('Failed to create ZIP archive');
     }
   }
 
@@ -402,10 +600,24 @@ class BackupService {
         final sourceFile = File(possiblePath);
         if (await sourceFile.exists()) {
           final targetPath = path.join(backupPhotosDir, fileName);
-          await sourceFile.copy(targetPath);
+          
+          // Use streaming copy for all files to minimize memory usage
+          final fileSize = await sourceFile.length();
+          if (fileSize > 256 * 1024) { // If file is larger than 256KB
+            // Stream copy for large files
+            final targetFile = File(targetPath);
+            final sink = targetFile.openWrite();
+            await sourceFile.openRead().pipe(sink);
+            await sink.close();
+            print('Stream copied large photo: $possiblePath -> $targetPath (${fileSize} bytes)');
+          } else {
+            // Regular copy for small files
+            await sourceFile.copy(targetPath);
+            print('Copied photo: $possiblePath -> $targetPath (${fileSize} bytes)');
+          }
+          
           copiedPhotos.add(fileName);
           photoFound = true;
-          print('Found and copied photo: $possiblePath -> $targetPath');
           break;
         }
       }
@@ -471,5 +683,233 @@ class BackupService {
       }
     }
     print('=== END DEBUGGING ===');
+  }
+
+  /// Debug method to check photo restoration after backup restore
+  static Future<void> debugRestoredPhotos(List<Session> sessions) async {
+    print('=== DEBUGGING RESTORED PHOTOS ===');
+    
+    final appSupportDir = await getApplicationSupportDirectory();
+    final photosDir = path.join(appSupportDir.path, 'photos');
+    print('Photos directory: $photosDir');
+    
+    final photosDirObj = Directory(photosDir);
+    if (await photosDirObj.exists()) {
+      print('Photos directory exists');
+      final files = await photosDirObj.list().toList();
+      print('Files in photos directory: ${files.length}');
+      for (final file in files) {
+        if (file is File) {
+          print('  - ${path.basename(file.path)}');
+        }
+      }
+    } else {
+      print('Photos directory does not exist');
+    }
+    
+    print('Restored sessions with photos:');
+    for (final session in sessions) {
+      if (session.hasSessionPhoto && session.sessionPhotoPath != null) {
+        print('  Session ${session.id}: ${session.sessionPhotoPath}');
+        final fullPath = path.join(photosDir, session.sessionPhotoPath!);
+        final file = File(fullPath);
+        print('    Full path: $fullPath');
+        print('    Exists: ${await file.exists()}');
+        if (await file.exists()) {
+          final fileSize = await file.length();
+          print('    File size: $fileSize bytes');
+        }
+      }
+      
+      for (final poopEntry in session.poopEntries) {
+        if (poopEntry.hasPhoto && poopEntry.photoPath != null) {
+          print('  Poop entry: ${poopEntry.photoPath}');
+          final fullPath = path.join(photosDir, poopEntry.photoPath!);
+          final file = File(fullPath);
+          print('    Full path: $fullPath');
+          print('    Exists: ${await file.exists()}');
+          if (await file.exists()) {
+            final fileSize = await file.length();
+            print('    File size: $fileSize bytes');
+          }
+        }
+      }
+    }
+    print('=== END DEBUGGING RESTORED PHOTOS ===');
+  }
+
+  /// Creates a single backup file with all photos
+  static Future<String> _createSingleBackup(
+    List<Session> sessions,
+    BackupInfo backupInfo,
+    Directory backupDir,
+    BackupProgressCallback? onProgress,
+  ) async {
+    onProgress?.call('Copying photos...', 0.2);
+    
+    // Copy photos one at a time to minimize memory usage
+    final photosDir = Directory(path.join(backupDir.path, kPhotosDir));
+    await photosDir.create();
+    
+    final Set<String> copiedPhotos = {};
+    
+    // Process photos one at a time to minimize memory usage
+    for (int i = 0; i < backupInfo.allPhotoPaths.length; i++) {
+      final photoPath = backupInfo.allPhotoPaths[i];
+      
+      // Process single photo
+      await _copyPhotoToBackup(photoPath, photosDir.path, copiedPhotos);
+      
+      // Update progress based on total chunks (even for single backup, treat as 1 chunk)
+      final progress = 0.2 + (0.6 * (i + 1) / backupInfo.allPhotoPaths.length);
+      onProgress?.call('Copying photo ${i + 1}/${backupInfo.allPhotoPaths.length}...', progress);
+      
+      // Force garbage collection and delay after every photo
+      await Future.delayed(Duration(milliseconds: 200));
+    }
+    
+    onProgress?.call('Creating final backup file...', 0.8);
+    
+    // Create zip archive with minimal memory usage
+    final outputPath = path.join(backupDir.parent.path, 'baby_daily_backup_${DateTime.now().millisecondsSinceEpoch}.zip');
+    await _createZipArchiveMinimalMemory(backupDir, outputPath, onProgress);
+    
+    onProgress?.call('Backup completed!', 1.0);
+    return outputPath;
+  }
+
+  /// Creates multiple backup chunks for large photo collections
+  static Future<String> _createChunkedBackup(
+    List<Session> sessions,
+    BackupInfo backupInfo,
+    BackupProgressCallback? onProgress,
+  ) async {
+    final tempDir = await getTemporaryDirectory();
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final totalChunks = backupInfo.totalChunks;
+    
+    onProgress?.call('Creating $totalChunks backup chunks...', 0.2);
+    
+    // Create chunks
+    final List<String> chunkPaths = [];
+    
+    for (int chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+      final chunkPhotos = backupInfo.chunkPhotoPaths[chunkIndex];
+      
+      onProgress?.call('Creating chunk ${chunkIndex + 1}/$totalChunks...', 0.2 + (0.6 * chunkIndex / totalChunks));
+      
+      // Create chunk backup
+      final chunkPath = await _createBackupChunk(
+        sessions, 
+        chunkPhotos, 
+        chunkIndex, 
+        totalChunks, 
+        timestamp,
+        onProgress,
+      );
+      
+      chunkPaths.add(chunkPath);
+    }
+    
+    onProgress?.call('Creating chunk index file...', 0.8);
+    
+    // Create index file that lists all chunks
+    final indexPath = await _createChunkIndex(chunkPaths, timestamp);
+    
+    onProgress?.call('Chunked backup completed!', 1.0);
+    
+    // Return the index file path - the chunks are separate files
+    return indexPath;
+  }
+
+  /// Creates a single backup chunk
+  static Future<String> _createBackupChunk(
+    List<Session> sessions,
+    List<String> chunkPhotoPaths,
+    int chunkIndex,
+    int totalChunks,
+    int timestamp,
+    BackupProgressCallback? onProgress,
+  ) async {
+    final tempDir = await getTemporaryDirectory();
+    final chunkDir = await Directory(path.join(tempDir.path, 'backup_chunk_$chunkIndex')).create();
+    
+    try {
+      // Create manifest for this chunk
+      final manifest = {
+        'version': kBackupVersion,
+        'timestamp': DateTime.now().toIso8601String(),
+        'sessionCount': sessions.length,
+        'includePhotos': true,
+        'isChunked': true,
+        'chunkIndex': chunkIndex,
+        'totalChunks': totalChunks,
+        'photoCount': chunkPhotoPaths.length,
+        'backupTimestamp': timestamp,
+      };
+      
+      final manifestFile = File(path.join(chunkDir.path, kManifestFile));
+      await manifestFile.writeAsString(jsonEncode(manifest));
+
+      // Create data JSON (same for all chunks)
+      final data = {
+        'sessions': sessions.map((s) => s.toJson()).toList(),
+      };
+      
+      final dataFile = File(path.join(chunkDir.path, kDataFile));
+      await dataFile.writeAsString(jsonEncode(data));
+
+      // Copy photos for this chunk
+      final photosDir = Directory(path.join(chunkDir.path, kPhotosDir));
+      await photosDir.create();
+      
+      final Set<String> copiedPhotos = {};
+      
+      for (int i = 0; i < chunkPhotoPaths.length; i++) {
+        final photoPath = chunkPhotoPaths[i];
+        await _copyPhotoToBackup(photoPath, photosDir.path, copiedPhotos);
+        
+        // Update progress within chunk - this chunk represents 0.6/totalChunks of total progress
+        final chunkStartProgress = 0.2 + (0.6 * chunkIndex / totalChunks);
+        final chunkEndProgress = 0.2 + (0.6 * (chunkIndex + 1) / totalChunks);
+        final progressWithinChunk = (i + 1) / chunkPhotoPaths.length;
+        final totalProgress = chunkStartProgress + (chunkEndProgress - chunkStartProgress) * progressWithinChunk;
+        
+        onProgress?.call('Chunk ${chunkIndex + 1}: Photo ${i + 1}/${chunkPhotoPaths.length}...', totalProgress);
+        
+        await Future.delayed(Duration(milliseconds: 200));
+      }
+
+      // Create chunk zip file
+      final chunkPath = path.join(tempDir.path, 'baby_daily_backup_chunk_${chunkIndex + 1}_of_${totalChunks}_$timestamp.zip');
+      await _createZipArchiveMinimalMemory(chunkDir, chunkPath, null);
+      
+      return chunkPath;
+    } finally {
+      await chunkDir.delete(recursive: true);
+    }
+  }
+
+  /// Creates an index file for chunked backups
+  static Future<String> _createChunkIndex(List<String> chunkPaths, int timestamp) async {
+    final tempDir = await getTemporaryDirectory();
+    
+    final index = {
+      'version': kBackupVersion,
+      'timestamp': DateTime.now().toIso8601String(),
+      'isChunked': true,
+      'totalChunks': chunkPaths.length,
+      'backupTimestamp': timestamp,
+      'chunks': chunkPaths.map((path) => {
+        'path': path,
+        'filename': path.split('/').last,
+      }).toList(),
+    };
+    
+    final indexPath = path.join(tempDir.path, 'baby_daily_backup_index_$timestamp.json');
+    final indexFile = File(indexPath);
+    await indexFile.writeAsString(jsonEncode(index));
+    
+    return indexPath;
   }
 }

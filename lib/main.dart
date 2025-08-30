@@ -7,6 +7,7 @@ import 'screens/analytics_screen.dart';
 import 'screens/session_history_screen.dart';
 import 'screens/session_screen.dart';
 import 'screens/settings_screen.dart';
+import 'services/settings_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -70,6 +71,8 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   initState() {
     super.initState();
+    // Initialize settings service
+    SettingsService.instance.initialize();
     // Load initial sessions
     Provider.of<SessionProvider>(context, listen: false).loadSessions();
   }
