@@ -231,10 +231,13 @@ class SessionProvider with ChangeNotifier {
     print('Inserting sessions from backup...');
     for (final session in sessions) {
       print('Restoring session: ${session.wakeUpTime}');
+      print('  - hasSessionPhoto: ${session.hasSessionPhoto}');
+      print('  - sessionPhotoPath: ${session.sessionPhotoPath}');
       if (session.hasSessionPhoto && session.sessionPhotoPath != null) {
         print('  - Session photo: ${session.sessionPhotoPath}');
       }
       for (final poopEntry in session.poopEntries) {
+        print('  - Poop entry: hasPhoto=${poopEntry.hasPhoto}, photoPath=${poopEntry.photoPath}');
         if (poopEntry.hasPhoto && poopEntry.photoPath != null) {
           print('  - Poop entry photo: ${poopEntry.photoPath}');
         }

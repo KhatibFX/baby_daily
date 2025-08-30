@@ -3,10 +3,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as path;
 import 'package:provider/provider.dart';
 
-import '../../shared/widgets/photo_view.dart';
-
 import '../../models/session.dart';
 import '../../providers/session_provider.dart';
+import '../../shared/widgets/photo_view.dart';
 
 class SessionPhotoCard extends StatelessWidget {
   final Session session;
@@ -32,6 +31,9 @@ class SessionPhotoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Debug: Print photo information
+    print('SessionPhotoCard.build: title=$title, photoPath=$photoPath, hasPhoto=$hasPhoto');
+
     return Card(
       child: Padding(
         padding: EdgeInsets.all(16.0),
@@ -118,6 +120,9 @@ class SessionPhotoCard extends StatelessWidget {
             snapshot.data!,
             photoPath!,
           );
+
+          // Debug: Print photo path information
+          print('SessionPhotoCard: photoPath=$photoPath, hasPhoto=$hasPhoto, fullPath=$fullPath');
 
           return Column(
             children: [
