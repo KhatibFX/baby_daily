@@ -1,10 +1,9 @@
 import 'dart:io';
-import 'dart:convert'; // Added for jsonDecode
+import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:path/path.dart' as path;
 
 import '../providers/session_provider.dart';
 import '../services/backup_service.dart';
@@ -282,24 +281,77 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
     }
   }
 
+  /// Restores data from a backup file
+  /// 
+  /// For chunked backups:
+  /// - Users can select multiple files (JSON index file + ZIP chunk files)
+  /// - The system automatically detects if it's a chunked backup by checking the JSON file
+  /// - Validates that all required chunk files are selected
+  /// - Uses the provided chunk paths instead of trying to find them in the same directory
+  /// 
+  /// For single backups:
+  /// - Users select a single ZIP file
+  /// - Standard restoration process
   Future<void> _restoreFromBackup(BuildContext context) async {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['zip', 'json'], // Allow both single backups and chunked backup index files
+        allowMultiple: true, // Allow multiple file selection for chunked backups
       );
 
       if (result != null && context.mounted) {
-        final file = result.files.single;
+        final files = result.files;
         final provider = Provider.of<SessionProvider>(context, listen: false);
+
+        // Check if this is a chunked backup (JSON file selected)
+        String? indexPath;
+        List<String> chunkPaths = [];
+        
+        for (final file in files) {
+          if (file.path!.endsWith('.json')) {
+            indexPath = file.path!;
+          } else if (file.path!.endsWith('.zip')) {
+            chunkPaths.add(file.path!);
+          }
+        }
+
+        // If we have an index file, validate it's a chunked backup
+        if (indexPath != null) {
+          try {
+            final indexData = jsonDecode(await File(indexPath).readAsString());
+            if (indexData['isChunked'] == true) {
+              // This is a chunked backup, validate we have the required chunks
+              final expectedChunks = indexData['totalChunks'] as int;
+              if (chunkPaths.length < expectedChunks) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Chunked backup requires $expectedChunks chunk files, but only ${chunkPaths.length} were selected. Please select all chunk files along with the index file.'),
+                      backgroundColor: Colors.orange,
+                      duration: const Duration(seconds: 5),
+                    ),
+                  );
+                }
+                return;
+              }
+            }
+          } catch (e) {
+            // Not a valid JSON file, treat as single backup
+            indexPath = null;
+          }
+        }
 
         // Show confirmation dialog
         final confirmed = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Confirm Restore'),
-            content: const Text('This will replace all current data with the backup data. '
-                'This action cannot be undone. Are you sure you want to continue?'),
+            content: Text(
+              indexPath != null 
+                ? 'This will restore from a chunked backup with ${chunkPaths.length} chunks. This will replace all current data with the backup data. This action cannot be undone. Are you sure you want to continue?'
+                : 'This will replace all current data with the backup data. This action cannot be undone. Are you sure you want to continue?'
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
@@ -361,7 +413,8 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
 
           // Restore the backup
           final sessions = await BackupService.restoreBackup(
-            file.path!,
+            indexPath ?? files.first.path!,
+            chunkPaths: indexPath != null ? chunkPaths : null, // Pass chunk paths for chunked backups
             onProgress: (message, progress) {
               if (context.mounted) {
                 // Update the dialog state
@@ -410,18 +463,16 @@ class _BackupRestoreScreenState extends State<BackupRestoreScreen> {
             },
           );
 
-          // Close progress dialog
           if (context.mounted) {
+            // Close progress dialog
             Navigator.of(context).pop();
-          }
 
-          // Update provider with restored sessions
-          await provider.restoreFromBackup(sessions);
+            // Restore sessions to database
+            await provider.restoreFromBackup(sessions);
 
-          if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Backup restored successfully'),
+              SnackBar(
+                content: Text('Successfully restored ${sessions.length} sessions from backup'),
                 backgroundColor: Colors.green,
               ),
             );

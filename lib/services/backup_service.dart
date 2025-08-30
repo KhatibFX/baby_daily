@@ -252,12 +252,16 @@ class BackupService {
 
   /// Restores data from a backup file
   /// Returns the restored sessions
-  static Future<List<Session>> restoreBackup(String backupPath, {BackupProgressCallback? onProgress}) async {
+  static Future<List<Session>> restoreBackup(
+    String backupPath, {
+    BackupProgressCallback? onProgress,
+    List<String>? chunkPaths, // Optional chunk paths for chunked backups
+  }) async {
     onProgress?.call('Reading backup file...', 0.0);
     
     // Check if this is a chunked backup by looking at the file extension
     if (backupPath.endsWith('.json')) {
-      return await _restoreChunkedBackup(backupPath, onProgress);
+      return await _restoreChunkedBackup(backupPath, onProgress, chunkPaths);
     } else {
       return await _restoreSingleBackup(backupPath, onProgress);
     }
@@ -458,7 +462,7 @@ class BackupService {
   }
 
   /// Restores data from a chunked backup
-  static Future<List<Session>> _restoreChunkedBackup(String indexPath, BackupProgressCallback? onProgress) async {
+  static Future<List<Session>> _restoreChunkedBackup(String indexPath, BackupProgressCallback? onProgress, List<String>? chunkPaths) async {
     onProgress?.call('Reading chunked backup index...', 0.0);
     
     // Read the index file
@@ -473,26 +477,29 @@ class BackupService {
     
     onProgress?.call('Found $totalChunks backup chunks', 0.1);
     
-    // Find chunk files in the same directory as the index file
-    final indexDir = path.dirname(indexPath);
-    final List<String> chunkPaths = [];
-    
-    for (final chunk in chunks) {
-      final chunkFileName = chunk['filename'] as String;
-      final chunkPath = path.join(indexDir, chunkFileName);
-      
-      if (await File(chunkPath).exists()) {
-        chunkPaths.add(chunkPath);
-      } else {
-        throw Exception('Chunk file not found: $chunkFileName');
+    // Use provided chunkPaths if available, otherwise find them
+    final List<String> actualChunkPaths;
+    if (chunkPaths != null && chunkPaths.length == totalChunks) {
+      actualChunkPaths = chunkPaths;
+      print('Using provided chunk paths for restoration.');
+    } else {
+      actualChunkPaths = [];
+      final indexDir = path.dirname(indexPath);
+      for (final chunk in chunks) {
+        final chunkFileName = chunk['filename'] as String;
+        final chunkPath = path.join(indexDir, chunkFileName);
+        if (await File(chunkPath).exists()) {
+          actualChunkPaths.add(chunkPath);
+        } else {
+          throw Exception('Chunk file not found: $chunkFileName');
+        }
       }
+      print('Found ${actualChunkPaths.length} chunk files from index.');
     }
-    
-    onProgress?.call('Found ${chunkPaths.length} chunk files', 0.2);
     
     // For now, we'll restore from the first chunk only
     // In a full implementation, you'd merge all chunks
-    final firstChunkPath = chunkPaths.first;
+    final firstChunkPath = actualChunkPaths.first;
     
     onProgress?.call('Restoring from first chunk...', 0.3);
     
@@ -900,9 +907,9 @@ class BackupService {
       'isChunked': true,
       'totalChunks': chunkPaths.length,
       'backupTimestamp': timestamp,
-      'chunks': chunkPaths.map((path) => {
-        'path': path,
-        'filename': path.split('/').last,
+      'chunks': chunkPaths.map((chunkPath) => {
+        'path': chunkPath,
+        'filename': chunkPath.split('/').last,
       }).toList(),
     };
     
