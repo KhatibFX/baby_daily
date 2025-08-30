@@ -43,9 +43,23 @@ class MilkEntry {
     );
   }
 
-  Map<String, dynamic> toJson() => toMap();
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'sessionId': sessionId,
+      'amount': amount,
+      'time': time.toIso8601String(),
+    };
+  }
 
-  factory MilkEntry.fromJson(Map<String, dynamic> json) => MilkEntry.fromMap(json);
+  factory MilkEntry.fromJson(Map<String, dynamic> json) {
+    return MilkEntry(
+      id: json['id'] as int?,
+      sessionId: json['sessionId'] as int,
+      amount: json['amount'] as int?,
+      time: DateTime.parse(json['time'] as String),
+    );
+  }
 
   /// Returns true if this entry has all mandatory fields filled
   bool get isComplete => amount != null && amount! > 0;

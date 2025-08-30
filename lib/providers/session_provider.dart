@@ -214,24 +214,39 @@ class SessionProvider with ChangeNotifier {
   }
 
   Future<void> restoreFromBackup(List<Session> sessions) async {
+    print('Starting restore from backup...');
+    print('Sessions to restore: ${sessions.length}');
+    
     // Clear existing sessions from database
     await _db.clearAllSessions();
+    print('Cleared existing sessions from database');
 
-    // Delete existing photos
-    final photosDir = Directory(await _photoDirectory);
-    if (await photosDir.exists()) {
-      await photosDir.delete(recursive: true);
-      await photosDir.create(recursive: true);
-    }
+    // Note: Photos are already restored by the backup service
+    // We don't need to clear the photos directory here
+    // Just reset the cached photo directory path to ensure fresh lookup
+    _photosDir = null;
+    print('Reset cached photo directory path');
 
     // Insert all sessions from backup
+    print('Inserting sessions from backup...');
     for (final session in sessions) {
+      print('Restoring session: ${session.wakeUpTime}');
+      if (session.hasSessionPhoto && session.sessionPhotoPath != null) {
+        print('  - Session photo: ${session.sessionPhotoPath}');
+      }
+      for (final poopEntry in session.poopEntries) {
+        if (poopEntry.hasPhoto && poopEntry.photoPath != null) {
+          print('  - Poop entry photo: ${poopEntry.photoPath}');
+        }
+      }
       await _db.restoreSession(session);
     }
+    print('All sessions restored');
 
     // Reload sessions
     await loadSessions();
     notifyListeners();
+    print('Restore completed');
   }
 
   /// Gets all sessions for analytics that overlap with the date range

@@ -35,9 +35,25 @@ class PeeEntry {
     );
   }
 
-  Map<String, dynamic> toJson() => toMap();
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'sessionId': sessionId,
+      'amount': amount?.name,
+      'remarks': remarks,
+      'time': time.toIso8601String(),
+    };
+  }
 
-  factory PeeEntry.fromJson(Map<String, dynamic> json) => PeeEntry.fromMap(json);
+  factory PeeEntry.fromJson(Map<String, dynamic> json) {
+    return PeeEntry(
+      id: json['id'] as int?,
+      sessionId: json['sessionId'] as int,
+      amount: PeeAmountExtension.fromString(json['amount'] as String?),
+      remarks: json['remarks'] as String?,
+      time: DateTime.parse(json['time'] as String),
+    );
+  }
 
   PeeEntry copyWith({
     int? id,

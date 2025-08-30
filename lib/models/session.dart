@@ -100,6 +100,10 @@ class Session {
     return {
       'id': id,
       'wakeUpTime': wakeUpTime.toIso8601String(),
+      'peeEntries': peeEntries.map((e) => e.toMap()).toList(),
+      'poopEntries': poopEntries.map((e) => e.toMap()).toList(),
+      'milkEntries': milkEntries.map((e) => e.toMap()).toList(),
+      'vitaminEntries': vitaminEntries.map((e) => e.toMap()).toList(),
       'sleepTime': sleepTime?.toIso8601String(),
       'sessionPhotoPath': sessionPhotoPath,
       'hasSessionPhoto': hasSessionPhoto ? 1 : 0,
@@ -111,6 +115,18 @@ class Session {
     return Session(
       id: map['id'] as int?,
       wakeUpTime: DateTime.parse(map['wakeUpTime']),
+      peeEntries: (map['peeEntries'] as List? ?? [])
+          .map((e) => PeeEntry.fromMap(e as Map<String, dynamic>))
+          .toList(),
+      poopEntries: (map['poopEntries'] as List? ?? [])
+          .map((e) => PoopEntry.fromMap(e as Map<String, dynamic>))
+          .toList(),
+      milkEntries: (map['milkEntries'] as List? ?? [])
+          .map((e) => MilkEntry.fromMap(e as Map<String, dynamic>))
+          .toList(),
+      vitaminEntries: (map['vitaminEntries'] as List? ?? [])
+          .map((e) => VitaminEntry.fromMap(e as Map<String, dynamic>))
+          .toList(),
       sleepTime: map['sleepTime'] != null ? DateTime.parse(map['sleepTime']) : null,
       sessionPhotoPath: map['sessionPhotoPath'] as String?,
       hasSessionPhoto: map['hasSessionPhoto'] == 1,

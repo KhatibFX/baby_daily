@@ -365,7 +365,7 @@ class DatabaseService {
       for (final entry in session.peeEntries) {
         await txn.insert('pee_entries', {
           'session_id': sessionId,
-          'amount': entry.amount?.index,
+          'amount': entry.amount?.name,
           'remarks': entry.remarks,
           'time': entry.time.toIso8601String(),
         });
@@ -375,9 +375,9 @@ class DatabaseService {
       for (final entry in session.poopEntries) {
         await txn.insert('poop_entries', {
           'session_id': sessionId,
-          'amount': entry.amount?.index,
-          'consistency': entry.consistency?.index,
-          'color': entry.color?.index,
+          'amount': entry.amount?.name,
+          'consistency': entry.consistency?.name,
+          'color': entry.color?.name,
           'time': entry.time.toIso8601String(),
           'photo_path': entry.photoPath,
           'has_photo': entry.hasPhoto ? 1 : 0,

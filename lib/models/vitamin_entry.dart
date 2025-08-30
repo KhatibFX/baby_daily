@@ -51,9 +51,25 @@ class VitaminEntry {
     );
   }
 
-  Map<String, dynamic> toJson() => toMap();
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'sessionId': sessionId,
+      'time': time.toIso8601String(),
+      'type': type?.name,
+      'notes': notes,
+    };
+  }
 
-  factory VitaminEntry.fromJson(Map<String, dynamic> json) => VitaminEntry.fromMap(json);
+  factory VitaminEntry.fromJson(Map<String, dynamic> json) {
+    return VitaminEntry(
+      id: json['id'] as int?,
+      sessionId: json['sessionId'] as int,
+      time: DateTime.parse(json['time'] as String),
+      type: json['type'] != null ? VitaminTypeExtension.fromString(json['type'] as String) : null,
+      notes: json['notes'] as String?,
+    );
+  }
 
   /// Returns true if this entry has all mandatory fields filled
   bool get isComplete => type != null;
