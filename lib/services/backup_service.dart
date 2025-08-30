@@ -513,14 +513,204 @@ class BackupService {
       print('Found ${actualChunkPaths.length} chunk files from index.');
     }
 
-    // For now, we'll restore from the first chunk only
-    // In a full implementation, you'd merge all chunks
-    final firstChunkPath = actualChunkPaths.first;
+    // Set up photos directory for restoration
+    final appDir = await getApplicationSupportDirectory();
+    final photosDir = path.join(appDir.path, 'photos');
+    final photosDirObj = Directory(photosDir);
+    
+    // Clear existing photos directory before restoring
+    if (await photosDirObj.exists()) {
+      print('Clearing existing photos directory: $photosDir');
+      await photosDirObj.delete(recursive: true);
+    }
+    
+    // Create fresh photos directory
+    await photosDirObj.create(recursive: true);
+    print('Created fresh photos directory: $photosDir');
 
-    onProgress?.call('Restoring from first chunk...', 0.3);
+    // Process chunks one by one
+    final List<Session> allSessions = [];
+    final Set<String> restoredPhotos = <String>{};
+    
+    for (int chunkIndex = 0; chunkIndex < actualChunkPaths.length; chunkIndex++) {
+      final chunkPath = actualChunkPaths[chunkIndex];
+      
+      onProgress?.call('Processing chunk ${chunkIndex + 1}/$totalChunks...', 0.2 + (0.6 * chunkIndex / totalChunks));
+      
+      // Extract chunk to temporary directory
+      final tempDir = await getTemporaryDirectory();
+      final extractDir = await Directory(path.join(tempDir.path, 'chunk_$chunkIndex')).create();
+      
+      try {
+        // Extract chunk
+        final chunkBytes = await File(chunkPath).readAsBytes();
+        final chunkArchive = ZipDecoder().decodeBytes(chunkBytes);
+        
+        for (final file in chunkArchive) {
+          if (file.isFile) {
+            final data = file.content as List<int>;
+            final filePath = path.join(extractDir.path, file.name);
+            await File(filePath).create(recursive: true);
+            await File(filePath).writeAsBytes(data);
+          }
+        }
+        
+        // Verify manifest
+        final manifestFile = File(path.join(extractDir.path, kManifestFile));
+        if (await manifestFile.exists()) {
+          final manifest = jsonDecode(await manifestFile.readAsString());
+          if (manifest['version'] != kBackupVersion) {
+            throw Exception('Incompatible backup version: ${manifest['version']}');
+          }
+        }
+        
+        // Read sessions from this chunk
+        final dataFile = File(path.join(extractDir.path, kDataFile));
+        if (await dataFile.exists()) {
+          final data = jsonDecode(await dataFile.readAsString());
+          final List<Session> chunkSessions = (data['sessions'] as List)
+              .map((s) => Session.fromJson(s))
+              .toList();
+          
+          // For the first chunk, use all sessions
+          // For subsequent chunks, we only need to update photo paths
+          if (chunkIndex == 0) {
+            allSessions.addAll(chunkSessions);
+          }
+        }
+        
+        // Extract photos from this chunk
+        final photosSourceDir = Directory(path.join(extractDir.path, kPhotosDir));
+        if (await photosSourceDir.exists()) {
+          await for (final photo in photosSourceDir.list()) {
+            if (photo is File) {
+              final photoFileName = path.basename(photo.path);
+              
+              // Only copy if not already restored (avoid duplicates)
+              if (!restoredPhotos.contains(photoFileName)) {
+                final newPath = path.join(photosDir, photoFileName);
+                await photo.copy(newPath);
+                restoredPhotos.add(photoFileName);
+                print('Restored photo from chunk ${chunkIndex + 1}: $photoFileName');
+              }
+            }
+          }
+        }
+        
+      } finally {
+        // Clean up temporary extraction directory
+        await extractDir.delete(recursive: true);
+      }
+    }
+    
+    onProgress?.call('Updating photo paths...', 0.8);
+    
+    // Update photo paths in all sessions to point to new location
+    print('Updating photo paths in sessions...');
+    for (final session in allSessions) {
+      // Update session photo path - store just the filename
+      if (session.sessionPhotoPath != null) {
+        final fileName = path.basename(session.sessionPhotoPath!);
+        print('Session photo path: ${session.sessionPhotoPath} -> $fileName');
+        session.sessionPhotoPath = fileName; // Just the filename, not the full path
+        session.hasSessionPhoto = true; // Ensure the flag is set
+      }
+      
+      // Update poop entry photo paths by creating new instances
+      final updatedPoopEntries = <PoopEntry>[];
+      for (final poopEntry in session.poopEntries) {
+        if (poopEntry.photoPath != null) {
+          final fileName = path.basename(poopEntry.photoPath!);
+          print('Poop entry photo path: ${poopEntry.photoPath} -> $fileName');
+          final updatedEntry = poopEntry.copyWith(
+            photoPath: fileName, // Just the filename, not the full path
+            hasPhoto: true, // Ensure the flag is set
+          );
+          updatedPoopEntries.add(updatedEntry);
+        } else {
+          updatedPoopEntries.add(poopEntry);
+        }
+      }
+      session.poopEntries.clear();
+      session.poopEntries.addAll(updatedPoopEntries);
+    }
+    
+    print('Photo path updates completed');
+    print('Total photos restored: ${restoredPhotos.length}');
+    print('Total sessions: ${allSessions.length}');
 
-    // Restore from the first chunk
-    return await _restoreSingleBackup(firstChunkPath, onProgress);
+    onProgress?.call('Preparing sessions for database...', 0.9);
+
+    // Reset session IDs to null so they get new IDs when inserted
+    // This ensures proper database relationships
+    final updatedSessions = <Session>[];
+    for (final session in allSessions) {
+      // Create new session with null ID
+      final updatedSession = Session(
+        id: null, // Reset ID so it gets a new one
+        wakeUpTime: session.wakeUpTime,
+        sleepTime: session.sleepTime,
+        sessionPhotoPath: session.sessionPhotoPath,
+        hasSessionPhoto: session.hasSessionPhoto || session.sessionPhotoPath != null,
+        isClosed: session.isClosed,
+      );
+      
+      // Create new entries with null IDs
+      for (final entry in session.peeEntries) {
+        final updatedEntry = PeeEntry(
+          id: null, // Reset ID
+          sessionId: 0, // Will be updated when session is inserted
+          amount: entry.amount,
+          remarks: entry.remarks,
+          time: entry.time,
+        );
+        updatedSession.addPeeEntry(updatedEntry);
+      }
+      
+      for (final entry in session.poopEntries) {
+        final updatedEntry = PoopEntry(
+          id: null, // Reset ID
+          sessionId: 0, // Will be updated when session is inserted
+          amount: entry.amount,
+          consistency: entry.consistency,
+          color: entry.color,
+          time: entry.time,
+          photoPath: entry.photoPath,
+          hasPhoto: entry.hasPhoto || entry.photoPath != null,
+        );
+        updatedSession.addPoopEntry(updatedEntry);
+      }
+      
+      for (final entry in session.milkEntries) {
+        final updatedEntry = MilkEntry(
+          id: null, // Reset ID
+          sessionId: 0, // Will be updated when session is inserted
+          amount: entry.amount,
+          time: entry.time,
+        );
+        updatedSession.addMilkEntry(updatedEntry);
+      }
+      
+      for (final entry in session.vitaminEntries) {
+        final updatedEntry = VitaminEntry(
+          id: null, // Reset ID
+          sessionId: 0, // Will be updated when session is inserted
+          time: entry.time,
+          type: entry.type,
+          notes: entry.notes,
+        );
+        updatedSession.addVitaminEntry(updatedEntry);
+      }
+      
+      updatedSessions.add(updatedSession);
+    }
+
+    onProgress?.call('Restore completed!', 1.0);
+    
+    // Debug: Check if photos were restored correctly
+    await debugRestoredPhotos(updatedSessions);
+    
+    return updatedSessions;
   }
 
   /// Adds all files in a directory to the archive
